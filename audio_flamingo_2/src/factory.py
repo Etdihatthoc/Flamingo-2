@@ -78,7 +78,14 @@ class CLAP(nn.Module):
         enable_fusion = True
         fusion_type = "aff_2d"
         self.afclap = create_htsat_model(audio_cfg, enable_fusion, fusion_type)
-        clap_state_dict = torch.load(clap_config["checkpoint"], map_location = 'cpu')
+        # Fix for PyTorch 2.6 weights_only change
+        try:
+            clap_state_dict = torch.load(clap_config["checkpoint"], map_location='cpu', weights_only=True)
+        except Exception as e:
+            # If weights_only=True fails, try with weights_only=False (less secure but necessary for older checkpoints)
+            print(f"Warning: Loading checkpoint with weights_only=False due to: {e}")
+            clap_state_dict = torch.load(clap_config["checkpoint"], map_location='cpu', weights_only=False)
+            
         clap_state_dict_copy = clap_state_dict['state_dict'].copy()
         for key in list(clap_state_dict['state_dict'].keys()):
             if 'audio' in key:

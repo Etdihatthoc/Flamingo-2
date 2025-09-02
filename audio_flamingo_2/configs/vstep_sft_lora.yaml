@@ -1,0 +1,88 @@
+train_config:
+  expdir: ./
+  run_name: vstep-lora-3B
+  delete_previous_checkpoint: true
+  batch_size: 2              # Small batch size for LoRA + long sequences
+  gradient_accumulation_steps: 16  # Effective batch size of 16
+  seed: 42
+  learning_rate: 0.0001      # Higher LR for LoRA (1e-4)
+  lr_scheduler: cosine       # Cosine schedule works well for LoRA
+  loss_multiplier: 1.0
+  warmup_steps: 500          # More warmup for LoRA
+  weight_decay: 0.01         # Light weight decay
+  precision: amp_bf16        # Mixed precision for memory efficiency
+  gradient_checkpointing: true  # Enable to save memory
+  num_epochs: 15             # Fewer epochs needed for LoRA
+  offline: false
+  freeze_lm_embeddings: true # Freeze embeddings to save memory
+  logging_steps: 5           # Log more frequently
+  # Single GPU settings - no distributed training
+  dist_backend: null
+  dist_url: null
+  no_set_device_rank: true
+  fsdp: false
+  horovod: false
+
+# LoRA-specific configuration
+lora_config:
+  rank: 8                   # LoRA rank - balance between performance and memory
+  alpha: 16                  # LoRA alpha (scaling factor)
+  dropout: 0.1              # LoRA dropout
+  target_modules:
+    # Language model linear layers (most important)
+    - "lang_encoder.model.layers.*.self_attn.q_proj"
+    - "lang_encoder.model.layers.*.self_attn.k_proj" 
+    - "lang_encoder.model.layers.*.self_attn.v_proj"
+    - "lang_encoder.model.layers.*.self_attn.o_proj"
+    - "lang_encoder.model.layers.*.mlp.gate_proj"
+    - "lang_encoder.model.layers.*.mlp.up_proj"
+    - "lang_encoder.model.layers.*.mlp.down_proj"
+    # Cross-attention layers (critical for audio-text alignment)
+    - "lang_encoder.gated_cross_attn_layers.*.gated_cross_attn_layer_sound.attn.q_linear"
+    - "lang_encoder.gated_cross_attn_layers.*.gated_cross_attn_layer_sound.attn.k_linear"
+    - "lang_encoder.gated_cross_attn_layers.*.gated_cross_attn_layer_sound.attn.v_linear"
+    - "lang_encoder.gated_cross_attn_layers.*.gated_cross_attn_layer_sound.attn.output_linear"
+
+data_config:
+  dataset_blending_global_weight: 1.0
+  dataset_blending_config:
+    VSTEP-SpeakingScoring/train:
+      weight: 1.0
+  
+  dataset_file_root: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests
+  data_root: /home/user01/aiotlab/sondinh/DATA_Vocal
+  dataset_blending_output: dataset_blending.json
+  max_tokens: 1800          # Increased for 1800 token prompts + output
+  num_workers: 8             # Moderate parallelism
+  
+  valid_dataset_config:
+    VSTEP-SpeakingScoring/val: true
+
+clap_config:
+  method: afclap-large
+  audio_embed_dim: 2048
+  checkpoint: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model/clap_ckpt/epoch_16.pt
+  
+  # Audio processing for variable length audio (3-4 minutes)
+  window_length: 10.0        # 10 seconds per window
+  window_overlap: 1.0        # No overlap
+  max_num_window: 25         # Increased to handle longer audio
+  max_num_fewshot: 1
+  finetune: false            # Keep CLAP frozen for LoRA
+
+model_config:
+  cache_dir: /home/user01/.cache
+  
+  # Use Qwen2.5-3B as requested
+  lang_encoder_path: Qwen/Qwen2.5-3B
+  tokenizer_path: Qwen/Qwen2.5-3B
+  
+  cross_attn_every_n_layers: 1
+  audio_transformer_kwargs: {
+    n_head: 8,
+    n_layers: 3,
+    d_inner: 2048,
+    max_num_media: 128,
+    max_window_per_audio: 1,   # Changed to 1 - processes each window individually
+    common_encoder_embed_dim: 1024
+  }

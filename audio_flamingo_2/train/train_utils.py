@@ -9,7 +9,7 @@ import os
 from tqdm import tqdm
 import sys
 from copy import deepcopy
-
+import gc
 from contextlib import suppress
 import torch
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -18,7 +18,7 @@ from torch.distributed.fsdp import (
     StateDictType,
 )
 from torch.distributed.fsdp.api import FullOptimStateDictConfig
-from einops import rearrange
+#from einops import rearrange
 
 
 class Dict2Class:
@@ -212,6 +212,9 @@ def train_one_epoch(
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
 
+            torch.cuda.empty_cache()
+            if (num_steps + 1) % 50 == 0:  # Periodic cleanup
+                gc.collect()
             # step time and reset end outside of rank 0
             step_time_m.update(time.time() - end)
             end = time.time()

@@ -2,3 +2,13 @@ __pycache__/
 .DS_Store
 core.*
 .cache/
+audio_flamingo_2/data/manifests/
+audio_flamingo_2/data/manifests_2/
+audio_flamingo_2/train/afclap_checkpoints/
+audio_flamingo_2/train/hf_model/
+audio_flamingo_2/train/hf_model_3B/
+*.txt
+*.sh
+*.pth
+*.pt
+*.safetensors

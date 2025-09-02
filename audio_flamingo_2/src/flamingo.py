@@ -145,7 +145,7 @@ class Flamingo(nn.Module):
             self.lang_encoder.clear_conditioned_layers()
 
         return output
-
+    
     def generate(
         self,
         audio_x: torch.Tensor,
