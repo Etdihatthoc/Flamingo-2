@@ -176,7 +176,7 @@ def main():
     # Load pretrained weights BEFORE FSDP wrapping
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = ""  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
