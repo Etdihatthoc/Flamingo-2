@@ -1,0 +1,77 @@
+train_config:
+  expdir: ./
+  run_name: vstep-sft-3B
+  delete_previous_checkpoint: true 
+  batch_size: 2  # Reduce due to memory constraints
+  gradient_accumulation_steps: 8  # Increase to maintain effective batch size
+  seed: 42
+  learning_rate: 0.00001  # Lower LR for fine-tuning
+  lr_scheduler: linear
+  loss_multiplier: 1.0
+  warmup_steps: 100
+  weight_decay: 0.1
+  precision: amp_bf16  # ["amp_bf16", "amp_bfloat16", "bf16", "fp16", "fp32"]
+  gradient_checkpointing: False 
+  num_epochs: 20  # Adjust based on your data size
+  offline: false
+  freeze_lm_embeddings: false
+  logging_steps: 10
+  dist_backend: nccl
+  dist_url: env:// 
+  no_set_device_rank: false 
+  fsdp: false  # Disable FSDP for single GPU training initially
+  fsdp_use_orig_params: false
+  fsdp_sharding_strategy: full
+  horovod: false
+  fsdp: false
+  dist_backend: null  # Add this line
+  dist_url: null      # Add this line  
+  no_set_device_rank: true  # Change this to true
+
+# instruction tuning hparams
+sft_config:
+  pretrained_path: null #/home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model  # Will be set to HuggingFace model path
+  pretrained_ckpt: null  # No local checkpoint initially
+  unfreeze_full_lm: false  # Unfreeze for better adaptation
+
+data_config:
+  dataset_blending_global_weight: 1.0  # Use full dataset each epoch
+
+  dataset_blending_config:
+    # Your VSTEP dataset
+    VSTEP-SpeakingScoring/train:
+      weight: 1.0
+
+  dataset_file_root: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests  # Where you'll put manifest files
+  data_root: /home/user01/aiotlab/sondinh/DATA_Vocal  # Your audio files root
+  dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-sft-3B/dataset_blending.json
+  max_tokens: 2345
+  num_workers: 8  # Reduce for stability
+
+  valid_dataset_config: 
+    # Your validation set
+    VSTEP-SpeakingScoring/val: true
+
+clap_config:
+  method: afclap-large
+  audio_embed_dim: 2048
+  checkpoint: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model/clap_ckpt/epoch_16.pt
+  window_length: 10.0  # 10 seconds per window
+  window_overlap: 1.0  # no overlap
+  max_num_window: 18   # Reduced to handle 3-minute minimum
+  max_num_fewshot: 1   
+  finetune: false
+
+model_config:
+  cache_dir: /home/user01/.cache
+  lang_encoder_path: Qwen/Qwen2.5-1.5B
+  tokenizer_path: Qwen/Qwen2.5-1.5B
+  cross_attn_every_n_layers: 3
+  audio_transformer_kwargs: {
+    n_head: 8,
+    n_layers: 3,
+    d_inner: 2048,
+    max_num_media: 128,
+    max_window_per_audio: 1,  # Changed to 6 (18 % 6 = 0 and 24 % 6 = 0)
+    common_encoder_embed_dim: 1024
+  }

@@ -58,6 +58,52 @@ from train_utils import (
 from valid_utils import validation_losses
 from src.factory import create_model_and_transforms
 
+def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=None):
+    """
+    Load pretrained Audio Flamingo 2 model from HuggingFace
+    Similar to inference_HF_pretrained/inference.py
+    """
+    print(f"Loading pretrained model from HuggingFace: {repo_id}")
+    
+    try:
+        from huggingface_hub import snapshot_download
+        from safetensors import safe_open
+        import json
+        
+        # Download model files
+        if hf_token:
+            snapshot_download(repo_id=repo_id, local_dir="./hf_model", token=hf_token)
+        else:
+            snapshot_download(repo_id=repo_id, local_dir="./hf_model")
+        
+        # Load metadata
+        with open("./hf_model/safe_ckpt/metadata.json", "r") as f:
+            metadata = json.load(f)
+        
+        # Reconstruct the full state_dict
+        state_dict = {}
+        
+        # Load each SafeTensors chunk
+        for chunk_name in metadata:
+            chunk_path = f"./hf_model/safe_ckpt/{chunk_name}.safetensors"
+            with safe_open(chunk_path, framework="pt", device="cpu") as f:
+                for key in f.keys():
+                    state_dict[key] = f.get_tensor(key)
+        
+        # Load state dict into model
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        
+        if missing_keys:
+            print(f"Missing keys when loading pretrained model: {missing_keys[:10]}...")  # Show first 10
+        if unexpected_keys:
+            print(f"Unexpected keys when loading pretrained model: {unexpected_keys[:10]}...")  # Show first 10
+            
+        print("Successfully loaded pretrained Audio Flamingo 2 weights")
+        
+    except Exception as e:
+        print(f"Failed to load pretrained model from HuggingFace: {e}")
+        print("Continuing with randomly initialized weights...")
+
 
 def random_seed(seed=42, rank=0):
     torch.manual_seed(seed + rank)
@@ -120,12 +166,20 @@ def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"  # disable the tokenizer parallelism warning
     model, tokenizer = create_model_and_transforms(
         **model_config,
-        clap_config=clap_config,
+        clap_config=clap_config, 
         use_local_files=args.offline,
         gradient_checkpointing=args.gradient_checkpointing,
         freeze_lm_embeddings=args.freeze_lm_embeddings,
         unfreeze_full_lm=unfreeze_full_lm
     )
+
+    # Load pretrained weights BEFORE FSDP wrapping
+    if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
+        # Load from HuggingFace instead of local checkpoint
+        hf_token = "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"  # Replace with your token or set to None for public models
+        load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
+        print("Loaded pretrained model from HuggingFace for SFT.")
+    print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
     random_seed(args.seed, args.rank)
 
     # Initialize logging
@@ -146,42 +200,42 @@ def main():
 
     # load pretrained model
     resume_from_epoch = 0
-    if (resume_from_checkpoint is None) and (sft_config is not None):
-        # just started SFT
-        pretrained_path = os.path.join(
-            sft_config['pretrained_path'],
-            sft_config['pretrained_ckpt']
-        )
-        if args.rank == 0:
-            print(f"Loading checkpoint from {pretrained_path}")
-        checkpoint = torch.load(pretrained_path, map_location="cpu")
-        msd = checkpoint["model_state_dict"]
-        msd = {k.replace("module.", ""): v for k, v in msd.items()}
+    # if (resume_from_checkpoint is None) and (sft_config is not None):
+    #     # just started SFT
+    #     pretrained_path = os.path.join(
+    #         sft_config['pretrained_path'],
+    #         sft_config['pretrained_ckpt']
+    #     )
+    #     if args.rank == 0:
+    #         print(f"Loading checkpoint from {pretrained_path}")
+    #     checkpoint = torch.load(pretrained_path, map_location="cpu")
+    #     msd = checkpoint["model_state_dict"]
+    #     msd = {k.replace("module.", ""): v for k, v in msd.items()}
 
-        # for fsdp, only one rank needs to load the state dict
-        if not args.fsdp or args.rank == 0:
-            model.load_state_dict(msd, False)
-            del checkpoint["model_state_dict"]
-            del msd
+    #     # for fsdp, only one rank needs to load the state dict
+    #     if not args.fsdp or args.rank == 0:
+    #         model.load_state_dict(msd, False)
+    #         del checkpoint["model_state_dict"]
+    #         del msd
 
 
-    elif resume_from_checkpoint is not None:
-        # continue training (either pretraining or STF)
-        if args.rank == 0:
-            print(f"Loading checkpoint from {resume_from_checkpoint}")
-        checkpoint = torch.load(resume_from_checkpoint, map_location="cpu")
-        msd = checkpoint["model_state_dict"]
-        msd = {k.replace("module.", ""): v for k, v in msd.items()}
-        resume_from_epoch = checkpoint["epoch"] + 1
+    # elif resume_from_checkpoint is not None:
+    #     # continue training (either pretraining or STF)
+    #     if args.rank == 0:
+    #         print(f"Loading checkpoint from {resume_from_checkpoint}")
+    #     checkpoint = torch.load(resume_from_checkpoint, map_location="cpu")
+    #     msd = checkpoint["model_state_dict"]
+    #     msd = {k.replace("module.", ""): v for k, v in msd.items()}
+    #     resume_from_epoch = checkpoint["epoch"] + 1
 
-        # for fsdp, only one rank needs to load the state dict
-        if not args.fsdp or args.rank == 0:
-            model.load_state_dict(msd, False)
-            del checkpoint["model_state_dict"]
-            del msd
+    #     # for fsdp, only one rank needs to load the state dict
+    #     if not args.fsdp or args.rank == 0:
+    #         model.load_state_dict(msd, False)
+    #         del checkpoint["model_state_dict"]
+    #         del msd
     
-    else:
-        pass
+    # else:
+    #     pass
 
     # Initialize FSDP / DDP, and ensure the model is on GPU
     print(f"Initializing distributed training with {args.world_size} GPUs.")
@@ -223,8 +277,8 @@ def main():
             else ShardingStrategy.HYBRID_SHARD,
             use_orig_params=args.fsdp_use_orig_params,
             mixed_precision=mp_policy,
-            forward_prefetch=True,
-            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+            forward_prefetch=False,
+            backward_prefetch=None,
             limit_all_gathers=True,
         )
         model.wrap_fsdp(wrapper_kwargs, device_id)
@@ -239,7 +293,7 @@ def main():
 
     else:
         model = model.to(device_id)
-        ddp_model = DDP(model, device_ids=[device_id])
+        ddp_model = DDP(model, device_ids=[device_id], find_unused_parameters=True)
 
     # Initialize gradient checkpointing
     if args.gradient_checkpointing:

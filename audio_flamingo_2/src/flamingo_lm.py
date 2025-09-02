@@ -49,7 +49,7 @@ class FlamingoLayer(nn.Module):
 
     def condition_use_cached_media(self, use_cached_media):
         self.use_cached_media = use_cached_media
-
+        
     def forward(
         self,
         lang_x,

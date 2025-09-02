@@ -218,8 +218,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", "-i", type=str, help="Path to input JSON file")
     parsed_args = parser.parse_args()
-
-    snapshot_download(repo_id="nvidia/audio-flamingo-2-SoundCoT", local_dir="./", token="YOUR_HF_TOKEN")
+    YOUR_HF_TOKEN = "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"
+    snapshot_download(repo_id="nvidia/audio-flamingo-2-SoundCoT", local_dir="./", token=YOUR_HF_TOKEN)
 
     config = yaml.load(open("configs/inference_CoT.yaml"), Loader=yaml.FullLoader)
 
