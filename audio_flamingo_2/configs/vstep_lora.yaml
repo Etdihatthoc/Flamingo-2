@@ -3,14 +3,14 @@ train_config:
   run_name: vstep-lora-1.5B
   delete_previous_checkpoint: true 
   batch_size: 1  # Increase since LoRA uses less memory
-  gradient_accumulation_steps: 4  # Reduce since we increased batch_size
+  gradient_accumulation_steps: 1  # Reduce since we increased batch_size
   seed: 42
-  learning_rate: 0.0001  # Higher LR for LoRA training
+  learning_rate: 0.000002  # Higher LR for LoRA training
   lr_scheduler: linear
   loss_multiplier: 1.0
-  warmup_steps: 50
+  warmup_steps: 200
   weight_decay: 0.01  # Lower weight decay for LoRA
-  precision: amp_bf16  # Use fp16 for stability
+  precision: amp_bfloat16  # Use bfloat16 for stability
   gradient_checkpointing: False 
   num_epochs: 10  # Fewer epochs for LoRA
   offline: false

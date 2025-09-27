@@ -65,6 +65,33 @@ def get_autocast(precision, cache_enabled=True):
     else:
         return suppress
 
+# def clip_grad_norm_LoRA(model, max_norm):
+#     """Custom gradient clipping that properly handles LoRA parameters"""
+#     # Get only trainable parameters (LoRA parameters)
+#     parameters = [p for p in model.parameters() if p.requires_grad]
+    
+#     if not parameters:
+#         return torch.tensor(0.)
+        
+#     device = parameters[0].device
+#     total_norm = torch.zeros(1, device=device)
+    
+#     # Calculate norm
+#     for p in parameters:
+#         if p.grad is not None:
+#             param_norm = p.grad.detach().data.norm(2)
+#             total_norm += param_norm.square()
+    
+#     total_norm = total_norm.sqrt()
+    
+#     # Apply clipping
+#     clip_coef = max_norm / (total_norm + 1e-6)
+#     if clip_coef < 1:
+#         for p in parameters:
+#             if p.grad is not None:
+#                 p.grad.detach().data.mul_(clip_coef)
+                
+#     return total_norm
 
 # def train_one_epoch(
 #     args,
@@ -315,9 +342,19 @@ def train_one_epoch(
         sep_locations = labels == tokenizer.sep_token_id
         eoc_locations = labels == endofchunk_token_id
 
+        # if not all(sep_locations.sum(dim=1) == eoc_locations.sum(dim=1)):
+        #     if show_progress:  # FIX: Thêm điều kiện rank check
+        #         print("Warning: <SEP>-<EoC> pairing mismatch at step {} due to max_token limit.".format(num_steps))
+        
         if not all(sep_locations.sum(dim=1) == eoc_locations.sum(dim=1)):
-            if show_progress:  # FIX: Thêm điều kiện rank check
-                print("Warning: <SEP>-<EoC> pairing mismatch at step {} due to max_token limit.".format(num_steps))
+            print(f"Warning: <SEP>-<EoC> pairing mismatch at step {num_steps} due to max_token limit.")
+            # Add more detailed diagnostics
+            for i in range(labels.shape[0]):
+                sep_count = sep_locations[i].sum().item()
+                eoc_count = eoc_locations[i].sum().item()
+                if sep_count != eoc_count:
+                    print(f"  Sample {i}: {sep_count} SEP vs {eoc_count} EoC tokens")
+                    # Consider fixing or skipping problematic samples
 
         for i in range(labels.shape[0]):
             shouldmask = True
@@ -354,9 +391,27 @@ def train_one_epoch(
             )
             loss = output.loss
 
+        if not torch.isfinite(loss):
+            print(f"Warning: Non-finite loss detected: {loss.item()}")
+            # Skip backward for this step
+            continue
+        else:
+            print(f"Training loss at step {num_steps}: {loss.item()}")
+
         divided_loss = loss / args.gradient_accumulation_steps
         train_loss = divided_loss * args.loss_multiplier
         train_loss.backward()
+
+        if args.rank == 0 and ((num_steps + 1) % args.logging_steps == 0):
+            grad_is_finite = True
+            for name, p in model.named_parameters():
+                if p.requires_grad and p.grad is not None:
+                    if not torch.isfinite(p.grad).all():
+                        print(f"!!! Non-finite gradient detected in {name} BEFORE clipping.")
+                        grad_is_finite = False
+                        break
+            if grad_is_finite:
+                print("--- Gradients are finite before clipping. ---")
 
         if (not args.freeze_lm_embeddings) and (
             not args.fsdp or args.fsdp_use_orig_params
@@ -383,17 +438,33 @@ def train_one_epoch(
                 )
 
         # clip gradient norm
-        if args.fsdp:
-            """
-            The way we clip gradients with FSDP is different than the non-FSDP case,
-            because during FSDP, gradient norms are computed over certain submodules,
-            rather than the entire model.
-            At least for OPT-125M, this didn't seem to make a difference in performance.
-            """
-            model.clip_grad_norm_(1.0)
-        else:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        # if args.fsdp:
+        #     """
+        #     The way we clip gradients with FSDP is different than the non-FSDP case,
+        #     because during FSDP, gradient norms are computed over certain submodules,
+        #     rather than the entire model.
+        #     At least for OPT-125M, this didn't seem to make a difference in performance.
+        #     """
+        #     model.clip_grad_norm_(1.0)
+        # else:
+        #     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
+        # if hasattr(model, 'module') and hasattr(model.module.lang_encoder, 'peft_config'):
+        #     # LoRA model with DDP
+        #     clip_grad_norm_LoRA(model.module, 1.0)
+        # elif hasattr(model.lang_encoder, 'peft_config'):
+        #     # LoRA model without DDP
+        #     clip_grad_norm_LoRA(model, 1.0)
+        # elif args.fsdp:
+        #     model.clip_grad_norm_(1.0)
+        # else:
+        #     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        
+        params_to_clip = [p for p in model.parameters() if p.requires_grad]
+        if params_to_clip:
+             torch.nn.utils.clip_grad_norm_(params_to_clip, 1.0)
+             print("--- Gradients clipped to 1.0 ---")
+        
         # step optimizer and log
         if (((num_steps + 1) % args.gradient_accumulation_steps) == 0) or (
             num_steps == num_batches_per_epoch - 1
@@ -437,7 +508,7 @@ def train_one_epoch(
 
                 step_time_m.reset()
                 data_time_m.reset()
-
+        
         # FIX: Log loss to console - Thêm điều kiện rank check và flush
         if show_progress:  # Chỉ rank 0 hoặc single GPU mới print
             if ((num_steps + 1) % args.logging_steps == 0):

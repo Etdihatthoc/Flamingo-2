@@ -59,7 +59,8 @@ from train_utils import (
     get_cast_dtype
 )
 from valid_utils import validation_losses
-from src.factory import create_model_and_transforms
+#from src.factory import create_model_and_transforms
+from src.factory_inference import create_model_and_transforms
 
 
 def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=None):
@@ -109,6 +110,16 @@ def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_to
         print("Continuing with randomly initialized weights...")
 
 
+# def apply_lora_to_model(model, lora_config):
+#     """Apply LoRA adapters to the language encoder"""
+#     # Only apply LoRA to the language encoder, not the entire model
+#     lang_encoder = model.lang_encoder
+    
+#     # Apply LoRA to language encoder
+#     lang_encoder_lora = get_peft_model(lang_encoder, lora_config)
+#     model.lang_encoder = lang_encoder_lora
+    
+#     return model
 def apply_lora_to_model(model, lora_config):
     """Apply LoRA adapters to the language encoder"""
     # Only apply LoRA to the language encoder, not the entire model
@@ -116,10 +127,19 @@ def apply_lora_to_model(model, lora_config):
     
     # Apply LoRA to language encoder
     lang_encoder_lora = get_peft_model(lang_encoder, lora_config)
+    
+    # Verify LoRA was applied correctly
+    if not hasattr(lang_encoder_lora, 'peft_config'):
+        raise ValueError("LoRA not properly applied to language encoder")
+    
     model.lang_encoder = lang_encoder_lora
     
+    # Count LoRA parameters
+    lora_param_count = sum(p.numel() for n, p in model.named_parameters() 
+                          if 'lora_' in n and p.requires_grad)
+    print(f"LoRA adapter parameters: {lora_param_count:,}")
+    
     return model
-
 
 def setup_lora_trainable_params(model, lora_config):
     """Setup which parameters should be trainable with LoRA"""
@@ -255,7 +275,7 @@ def main():
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
@@ -327,6 +347,7 @@ def main():
         trainable_params,
         lr=args.learning_rate,
         weight_decay=args.weight_decay,
+        eps=1e-6,
     )
 
     # Load optimizer checkpoint if resuming
@@ -441,4 +462,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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
