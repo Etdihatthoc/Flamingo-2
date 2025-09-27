@@ -76,16 +76,16 @@ def convert_csv_to_manifest(csv_path, split_name, output_path, data_root, audio_
 if __name__ == "__main__":
     # Define paths
     data_root = "/home/user01/aiotlab/sondinh/DATA_Vocal"
-    manifest_root = "./data/manifests"
+    manifest_root = "./data/manifests-balance"
     audio_subdir = ""  # since your audio files are directly in data_root
     
     # Convert train, validation, and test sets
     datasets = [
-        ("train", "/home/user06/data/Speaking_VSTEP/Label/after_filter/train_new_clean.csv"),
+        ("train", "/home/user06/data/Speaking_VSTEP/Label/after_filter/balanced_vstep_dataset_v2.csv"),
         ("val", "/home/user06/data/Speaking_VSTEP/Label/after_filter/val_new_clean.csv"),
         ("test", "/home/user06/data/Speaking_VSTEP/Label/after_filter/test_new_clean.csv")
     ]
     
     for split, csv_path in datasets:
         output_path = os.path.join(manifest_root, f"VSTEP-SpeakingScoring/{split}.json")
-        convert_csv_to_manifest(csv_path, split, output_path, data_r
+        convert_csv_to_manifest(csv_path, split, output_path, data_root, audio_subdir)

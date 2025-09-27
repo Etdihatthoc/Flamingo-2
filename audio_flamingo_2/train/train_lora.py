@@ -108,6 +108,7 @@ def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_to
         print(f"Failed to load pretrained model from HuggingFace: {e}")
         print("Continuing with randomly initialized weights...")
 
+
 def apply_lora_to_model(model, lora_config):
     """Apply LoRA adapters to the language encoder"""
     # Only apply LoRA to the language encoder, not the entire model
@@ -403,7 +404,7 @@ def main():
         time.sleep(1.0)
 
         # Validation 
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
             if args.world_size > 1:
                 torch.distributed.barrier()
                 
