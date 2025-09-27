@@ -62,7 +62,7 @@ from valid_utils import validation_losses
 from src.factory import create_model_and_transforms
 
 
-def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2", hf_token=None):
+def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=None):
     """
     Load pretrained Audio Flamingo 2 model from HuggingFace
     Similar to inference_HF_pretrained/inference.py
@@ -76,12 +76,12 @@ def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2", hf_token=N
         
         # Download model files
         if hf_token:
-            snapshot_download(repo_id=repo_id, local_dir="./hf_model_3B", token=hf_token)
+            snapshot_download(repo_id=repo_id, local_dir="./hf_model", token=hf_token)
         else:
-            snapshot_download(repo_id=repo_id, local_dir="./hf_model_3B")
+            snapshot_download(repo_id=repo_id, local_dir="./hf_model")
         
         # Load metadata
-        with open("./hf_model_3B/safe_ckpt/metadata.json", "r") as f:
+        with open("./hf_model/safe_ckpt/metadata.json", "r") as f:
             metadata = json.load(f)
         
         # Reconstruct the full state_dict
@@ -89,7 +89,7 @@ def load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2", hf_token=N
         
         # Load each SafeTensors chunk
         for chunk_name in metadata:
-            chunk_path = f"./hf_model_3B/safe_ckpt/{chunk_name}.safetensors"
+            chunk_path = f"./hf_model/safe_ckpt/{chunk_name}.safetensors"
             with safe_open(chunk_path, framework="pt", device="cpu") as f:
                 for key in f.keys():
                     state_dict[key] = f.get_tensor(key)
@@ -255,8 +255,8 @@ def main():
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
-        load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2", hf_token=hf_token)
+        hf_token = "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"  # Replace with your token or set to None for public models
+        load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
@@ -441,4 +441,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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

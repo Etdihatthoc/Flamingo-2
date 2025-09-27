@@ -1,6 +1,6 @@
 train_config:
   expdir: ./
-  run_name: vstep-lora-3B
+  run_name: vstep-lora-1.5B
   delete_previous_checkpoint: true 
   batch_size: 1  # Increase since LoRA uses less memory
   gradient_accumulation_steps: 4  # Reduce since we increased batch_size
@@ -78,8 +78,8 @@ whisper_config:
 
 model_config:
   cache_dir: /home/user01/.cache
-  lang_encoder_path: Qwen/Qwen2.5-3B
-  tokenizer_path: Qwen/Qwen2.5-3B
+  lang_encoder_path: Qwen/Qwen2.5-1.5B
+  tokenizer_path: Qwen/Qwen2.5-1.5B
   cross_attn_every_n_layers: 3
   audio_transformer_kwargs: {
     n_head: 8,
