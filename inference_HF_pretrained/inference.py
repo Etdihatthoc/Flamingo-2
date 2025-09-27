@@ -179,7 +179,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", "-i", type=str, help="Path to input JSON file")
     parsed_args = parser.parse_args()
-    YOUR_HF_TOKEN = ""
+    YOUR_HF_TOKEN = "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"
     snapshot_download(repo_id="nvidia/audio-flamingo-2", local_dir="./", token=YOUR_HF_TOKEN)
 
     config = yaml.load(open("configs/inference.yaml"), Loader=yaml.FullLoader)
@@ -217,7 +217,12 @@ if __name__ == "__main__":
         state_dict.update(chunk_tensors)
 
     missing_keys, unexpected_keys = model.load_state_dict(state_dict, False)
+    if missing_keys:
+        print(f"Missing keys when loading pretrained model: {missing_keys[:20]}...")  # Show first 20
+    if unexpected_keys:
+        print(f"Unexpected keys when loading pretrained model: {unexpected_keys[:20]}...")  # Show first 20
 
+    print("Successfully loaded pretrained Audio Flamingo 2 weights")
     autocast = get_autocast(
         args.precision, cache_enabled=(not args.fsdp)
     )

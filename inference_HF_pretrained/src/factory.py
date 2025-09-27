@@ -65,11 +65,48 @@ class CLAPAudioCfp:
 
 
 class CLAP(nn.Module):
+    # def __init__(self, clap_config):
+    #     super(CLAP, self).__init__()
+
+    #     self.clap_config = clap_config
+
+    #     self.method = clap_config["method"]
+    #     device_id = f'cuda:{torch.cuda.current_device()}'
+
+    #     if ('finetune' in clap_config) and clap_config['finetune']:
+    #         self.finetune = True 
+    #         print('Finetuning CLAP encoder as well!')
+    #     else:
+    #         self.finetune = False 
+
+    #     audio_cfg = CLAPAudioCfp()
+    #     enable_fusion = True
+    #     fusion_type = "aff_2d"
+    #     self.nvclap = create_htsat_model(audio_cfg, enable_fusion, fusion_type)
+    #     clap_state_dict = torch.load(clap_config["checkpoint"], map_location = 'cpu')
+    #     clap_state_dict_copy = clap_state_dict['state_dict'].copy()
+    #     for key in list(clap_state_dict['state_dict'].keys()):
+    #         if 'audio' in key:
+    #             clap_state_dict_copy[key.replace('module.audio_branch.','')] = clap_state_dict_copy[key]
+    #             del clap_state_dict_copy[key]
+    #         else:
+    #             del clap_state_dict_copy[key]
+    #     self.nvclap.load_state_dict(clap_state_dict_copy, strict = False)
+    #     self.nvclap = self.nvclap.to(device_id)
+        
+    #     for param in self.nvclap.parameters():
+    #         param.requires_grad = self.finetune
+
+    #     if self.finetune:
+    #         self.nvclap.train()
+    #     else:
+    #         self.nvclap.eval()
+
+    #     print('loaded NVCLAP model: {}'.format(clap_config["checkpoint"]))
     def __init__(self, clap_config):
         super(CLAP, self).__init__()
 
         self.clap_config = clap_config
-
         self.method = clap_config["method"]
         device_id = f'cuda:{torch.cuda.current_device()}'
 
@@ -79,11 +116,31 @@ class CLAP(nn.Module):
         else:
             self.finetune = False 
 
-        audio_cfg = CLAPAudioCfp()
-        enable_fusion = True
-        fusion_type = "aff_2d"
-        self.nvclap = create_htsat_model(audio_cfg, enable_fusion, fusion_type)
-        clap_state_dict = torch.load(clap_config["checkpoint"], map_location = 'cpu')
+        # Handle different methods
+        if self.method == "nvclap-large":
+            # Use nvclap architecture (same as inference)
+            audio_cfg = CLAPAudioCfp()
+            enable_fusion = True
+            fusion_type = "aff_2d"
+            self.nvclap = create_htsat_model(audio_cfg, enable_fusion, fusion_type)
+            model_attr = 'nvclap'
+        elif self.method in ["afclap-large", "afclap"]:
+            # Use afclap architecture 
+            audio_cfg = CLAPAudioCfp()
+            enable_fusion = True
+            fusion_type = "aff_2d"
+            self.afclap = create_htsat_model(audio_cfg, enable_fusion, fusion_type)
+            model_attr = 'afclap'
+        else:
+            raise ValueError(f"Unsupported CLAP method: {self.method}")
+
+        # Load checkpoint
+        try:
+            clap_state_dict = torch.load(clap_config["checkpoint"], map_location='cpu', weights_only=True)
+        except Exception as e:
+            print(f"Warning: Loading checkpoint with weights_only=False due to: {e}")
+            clap_state_dict = torch.load(clap_config["checkpoint"], map_location='cpu', weights_only=False)
+            
         clap_state_dict_copy = clap_state_dict['state_dict'].copy()
         for key in list(clap_state_dict['state_dict'].keys()):
             if 'audio' in key:
@@ -91,19 +148,21 @@ class CLAP(nn.Module):
                 del clap_state_dict_copy[key]
             else:
                 del clap_state_dict_copy[key]
-        self.nvclap.load_state_dict(clap_state_dict_copy, strict = False)
-        self.nvclap = self.nvclap.to(device_id)
         
-        for param in self.nvclap.parameters():
+        # Load state dict to correct model
+        model = getattr(self, model_attr)
+        model.load_state_dict(clap_state_dict_copy, strict=False)
+        model = model.to(device_id)
+        
+        for param in model.parameters():
             param.requires_grad = self.finetune
 
         if self.finetune:
-            self.nvclap.train()
+            model.train()
         else:
-            self.nvclap.eval()
+            model.eval()
 
-        print('loaded NVCLAP model: {}'.format(clap_config["checkpoint"]))
-                
+        print(f'loaded {self.method} model: {clap_config["checkpoint"]}')           
     def get_mel(self, audio_data):
 
         # mel shape: (n_mels, T)

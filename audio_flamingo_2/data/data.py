@@ -373,10 +373,11 @@ class AudioTextData(torch.utils.data.Dataset):
         else:
             raise NotImplementedError
 
-        if encoder_config["method"] == 'afclap-large':
+        if encoder_config["method"] in ['afclap-large', 'nvclap-large', 'afclap']:  # <- Thêm hỗ trợ cho nvclap-large
             sr = 16000
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Method {encoder_config['method']} not supported")
+
 
         window_length  = int(float(encoder_config["window_length"]) * sr)
         window_overlap = int(float(encoder_config["window_overlap"]) * sr)

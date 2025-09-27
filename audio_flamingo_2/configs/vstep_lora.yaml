@@ -1,8 +1,8 @@
 train_config:
   expdir: ./
-  run_name: vstep-lora-1.5B
+  run_name: vstep-lora-3B
   delete_previous_checkpoint: true 
-  batch_size: 3  # Increase since LoRA uses less memory
+  batch_size: 1  # Increase since LoRA uses less memory
   gradient_accumulation_steps: 4  # Reduce since we increased batch_size
   seed: 42
   learning_rate: 0.0001  # Higher LR for LoRA training
@@ -47,7 +47,7 @@ data_config:
 
   dataset_file_root: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance
   data_root: /home/user01/aiotlab/sondinh/DATA_Vocal
-  dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-1.5B/dataset_blending.json
+  dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-3B/dataset_blending.json
   max_tokens: 2345
   num_workers: 8  # Reduce for stability
 
@@ -55,19 +55,31 @@ data_config:
     VSTEP-SpeakingScoring/val: true
 
 clap_config:
-  method: afclap-large
+  method: nvclap-large
   audio_embed_dim: 2048
-  checkpoint: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model/clap_ckpt/epoch_16.pt
-  window_length: 30.0
-  window_overlap: 1.0
-  max_num_window: 6
-  max_num_fewshot: 1   
+  checkpoint: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model_3B/clap_ckpt/epoch_16.pt
+
+  window_length: 30.0  # seconds
+  window_overlap: 0.0  # seconds
+  max_num_window: 6  # 2 minutes
+  max_num_fewshot: 1  # number of fewshot samples (including the final one)
   finetune: false
+
+whisper_config:  
+  method: whisper-large-v3
+  path: openai/whisper-large-v3
+  audio_embed_dim: 1280
+  sampling_rate: 16000
+
+  window_length: 30.0  # seconds
+  window_overlap: 0.0  # seconds
+  max_num_window: 1  # 5 minutes
+  max_num_fewshot: 1  # number of fewshot samples (including the final one)
 
 model_config:
   cache_dir: /home/user01/.cache
-  lang_encoder_path: Qwen/Qwen2.5-1.5B
-  tokenizer_path: Qwen/Qwen2.5-1.5B
+  lang_encoder_path: Qwen/Qwen2.5-3B
+  tokenizer_path: Qwen/Qwen2.5-3B
   cross_attn_every_n_layers: 3
   audio_transformer_kwargs: {
     n_head: 8,
