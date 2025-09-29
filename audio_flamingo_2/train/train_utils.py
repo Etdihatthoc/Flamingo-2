@@ -3,7 +3,7 @@
 
 # Adapted from https://github.com/mlfoundations/open_flamingo under the MIT license.
 #   LICENSE is in incl_licenses directory.
-
+import wandb
 import time
 import os
 from tqdm import tqdm
@@ -382,6 +382,13 @@ def train_one_epoch(
 
         # gradient accumulation w/ fsdp cpu offloading requires a no_sync context manager
         with autocast():
+            if hasattr(model, 'lang_encoder') and hasattr(model.lang_encoder, '_use_cached_audio_x'):
+                model.lang_encoder._use_cached_audio_x = False
+                model.lang_encoder.clear_conditioned_layers()
+            elif hasattr(model, 'module') and hasattr(model.module.lang_encoder, '_use_cached_audio_x'):
+                model.module.lang_encoder._use_cached_audio_x = False
+                model.module.lang_encoder.clear_conditioned_layers()
+                
             output = model(
                 audio_x=audio_clips,
                 audio_x_mask=audio_embed_mask,
@@ -391,27 +398,9 @@ def train_one_epoch(
             )
             loss = output.loss
 
-        if not torch.isfinite(loss):
-            print(f"Warning: Non-finite loss detected: {loss.item()}")
-            # Skip backward for this step
-            continue
-        else:
-            print(f"Training loss at step {num_steps}: {loss.item()}")
-
         divided_loss = loss / args.gradient_accumulation_steps
         train_loss = divided_loss * args.loss_multiplier
         train_loss.backward()
-
-        if args.rank == 0 and ((num_steps + 1) % args.logging_steps == 0):
-            grad_is_finite = True
-            for name, p in model.named_parameters():
-                if p.requires_grad and p.grad is not None:
-                    if not torch.isfinite(p.grad).all():
-                        print(f"!!! Non-finite gradient detected in {name} BEFORE clipping.")
-                        grad_is_finite = False
-                        break
-            if grad_is_finite:
-                print("--- Gradients are finite before clipping. ---")
 
         if (not args.freeze_lm_embeddings) and (
             not args.fsdp or args.fsdp_use_orig_params
@@ -438,16 +427,16 @@ def train_one_epoch(
                 )
 
         # clip gradient norm
-        # if args.fsdp:
-        #     """
-        #     The way we clip gradients with FSDP is different than the non-FSDP case,
-        #     because during FSDP, gradient norms are computed over certain submodules,
-        #     rather than the entire model.
-        #     At least for OPT-125M, this didn't seem to make a difference in performance.
-        #     """
-        #     model.clip_grad_norm_(1.0)
-        # else:
-        #     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if args.fsdp:
+            """
+            The way we clip gradients with FSDP is different than the non-FSDP case,
+            because during FSDP, gradient norms are computed over certain submodules,
+            rather than the entire model.
+            At least for OPT-125M, this didn't seem to make a difference in performance.
+            """
+            model.clip_grad_norm_(1.0)
+        else:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         # if hasattr(model, 'module') and hasattr(model.module.lang_encoder, 'peft_config'):
         #     # LoRA model with DDP
@@ -460,10 +449,10 @@ def train_one_epoch(
         # else:
         #     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         
-        params_to_clip = [p for p in model.parameters() if p.requires_grad]
-        if params_to_clip:
-             torch.nn.utils.clip_grad_norm_(params_to_clip, 1.0)
-             print("--- Gradients clipped to 1.0 ---")
+        # params_to_clip = [p for p in model.parameters() if p.requires_grad]
+        # if params_to_clip:
+        #      torch.nn.utils.clip_grad_norm_(params_to_clip, 1.0)
+        #      print("--- Gradients clipped to 1.0 ---")
         
         # step optimizer and log
         if (((num_steps + 1) % args.gradient_accumulation_steps) == 0) or (
@@ -508,14 +497,36 @@ def train_one_epoch(
 
                 step_time_m.reset()
                 data_time_m.reset()
-        
-        # FIX: Log loss to console - Thêm điều kiện rank check và flush
-        if show_progress:  # Chỉ rank 0 hoặc single GPU mới print
-            if ((num_steps + 1) % args.logging_steps == 0):
-                print(
-                    f"Step {num_steps+1}/{num_batches_per_epoch} of epoch {epoch+1}/{args.num_epochs} complete. Loss: {loss.item():.3f}",
-                    flush=True  # FIX: Thêm flush để đảm bảo output hiển thị ngay lập tức
-                )
+                
+        if show_progress and ((num_steps + 1) % args.logging_steps == 0):
+            log_dict = {
+                "data_time": data_time_m.avg,
+                "step_time": step_time_m.avg,
+                "samples_per_second": samples_per_second,
+                "samples_per_second_per_gpu": samples_per_second_per_gpu,
+                "lr": optimizer.param_groups[0]["lr"],
+                "loss": loss.item()
+            }
+            
+            # Log to tensorboard
+            if tb is not None:
+                for key in log_dict:
+                    tb.add_scalar("Train/{}".format(key), log_dict[key], global_step)
+            
+            # NEW: Log to wandb
+            if wandb.run is not None:
+                wandb.log({
+                    "train/loss": loss.item(),
+                    "train/learning_rate": optimizer.param_groups[0]["lr"],
+                    "train/samples_per_second": samples_per_second,
+                    "epoch": epoch,
+                    "step": global_step
+                }, step=global_step)
+            
+            print(
+                f"Step {num_steps+1}/{num_batches_per_epoch} of epoch {epoch+1}/{args.num_epochs} complete. Loss: {loss.item():.6f}",
+                flush=True
+            )
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

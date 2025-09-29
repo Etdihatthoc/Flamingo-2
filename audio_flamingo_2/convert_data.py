@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import os
 import librosa
-from prompt_3 import system_prompt_fewshot
+from prompt_3 import system_prompt
 from tqdm import tqdm
 import pandas as pd
 
@@ -45,7 +45,7 @@ def convert_csv_to_manifest(csv_path, split_name, output_path, data_root, audio_
         filename = audio_path#os.path.basename(audio_path)
         
         # Format the prompt (system prompt + transcript)
-        prompt = f"{system_prompt_fewshot}\n\nTranscript: {row['text']}"
+        prompt = f"{system_prompt}\n\nTranscript: {row['text']}"
         
         # Format the expected output to match your current format
         total_score = (float(row['grammar']) + float(row['vocabulary']) + float(row['content'])) / 3.0

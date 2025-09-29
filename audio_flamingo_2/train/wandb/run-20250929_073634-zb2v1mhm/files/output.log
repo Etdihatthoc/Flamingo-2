@@ -1,0 +1,164 @@
+✅ Wandb initialized
+creating model
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3483.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/_utils.py:776: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
+  return self.fget.__get__(instance, owner)()
+Warning: Loading checkpoint with weights_only=False due to: Weights only load failed. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution.Do it only if you get the file from a trusted source. WeightsUnpickler error: Unsupported class numpy.core.multiarray.scalar
+loaded nvclap-large model: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/hf_model_3B/clap_ckpt/epoch_16.pt
+Flamingo model initialized with 278,493,202 trainable parameters (audio transformer has 75,538,432, LM has 202,954,770)
+Loading pretrained model from HuggingFace: nvidia/audio-flamingo-2-1.5B
+Fetching 13 files: 100%|███████████████████████████████████████████████████████████████████████████████| 13/13 [00:00<00:00, 667.63it/s]
+Unexpected keys when loading pretrained model: ['lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn.norm.bias', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn.norm.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn.to_kv.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn.to_out.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn.to_q.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.attn_gate', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.ff.0.bias', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.ff.0.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.ff.1.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.ff.3.weight', 'lang_encoder.model.layers.0.gated_cross_attn_layer_sound.ff_gate', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn.norm.bias', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn.norm.weight', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn.to_kv.weight', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn.to_out.weight', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn.to_q.weight', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.attn_gate', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.ff.0.bias', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.ff.0.weight', 'lang_encoder.model.layers.1.gated_cross_attn_layer_sound.ff.1.weight']...
+Successfully loaded pretrained Audio Flamingo 2 weights
+Loaded pretrained model from HuggingFace for SFT.
+Model created with 2100567401 parameters
+LoRA adapter parameters: 18,464,768
+Total parameters: 2,119,032,169
+Trainable parameters: 511,456,786
+Trainable %: 24.14%
+Model created with LoRA adapters
+Start running LoRA training on rank 0.
+Found LoRA checkpoint .//vstep-lora-1.5B/lora_checkpoint_0.pt for run vstep-lora-1.5B.
+Resumed from LoRA checkpoint, starting from epoch 1
+force reblending dataset at epoch 0; reading all dataset files
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/train.json
+Limiting dataset from 10119 to 20 samples
+randomly shuffling key-value pairs
+blending VSTEP-SpeakingScoring/train
+writing reblended dataset file to: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-3B/dataset_blending-reblended.json
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/utils/data/dataloader.py:560: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+Total training steps: 200
+start LoRA training from epoch 1
+force reblending dataset at epoch 1; reading all dataset files
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/train.json
+Limiting dataset from 10119 to 20 samples
+randomly shuffling key-value pairs
+blending VSTEP-SpeakingScoring/train
+force shuffling at new epoch 1 for dataset VSTEP-SpeakingScoring/train
+randomly shuffling key-value pairs
+writing reblended dataset file to: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-3B/dataset_blending-reblended.json
+num_batches_per_epoch=20, total_training_steps=200
+ 10%|██████████▌                                                                                               | 20/200 [00:00<?, ?it/s]/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torchaudio/transforms/_transforms.py:611: UserWarning: Argument 'onesided' has been deprecated and has no influence on the behavior of this module.
+  warnings.warn(
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torchvision/transforms/functional.py:1603: UserWarning: The default value of the antialias parameter of all the resizing transforms (Resize(), RandomResizedCrop(), etc.) will change from None to True in v0.17, in order to be consistent across the PIL and Tensor backends. To suppress this warning, directly pass antialias=True (recommended, future default), antialias=None (current default, which means False for Tensors and True for PIL), or antialias=False (only works on Tensors - PIL will still use antialiasing). This also applies if you are using the inference transforms from the models weights: update the call to weights.transforms(antialias=True).
+  warnings.warn(
+ 10%|██████████▎                                                                                       | 21/200 [00:10<32:03, 10.75s/it]/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torchaudio/transforms/_transforms.py:611: UserWarning: Argument 'onesided' has been deprecated and has no influence on the behavior of this module.
+  warnings.warn(
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torchvision/transforms/functional.py:1603: UserWarning: The default value of the antialias parameter of all the resizing transforms (Resize(), RandomResizedCrop(), etc.) will change from None to True in v0.17, in order to be consistent across the PIL and Tensor backends. To suppress this warning, directly pass antialias=True (recommended, future default), antialias=None (current default, which means False for Tensors and True for PIL), or antialias=False (only works on Tensors - PIL will still use antialiasing). This also applies if you are using the inference transforms from the models weights: update the call to weights.transforms(antialias=True).
+  warnings.warn(
+ 20%|███████████████████▌                                                                              | 40/200 [00:31<04:12,  1.58s/it]
+Step 5/20 of epoch 2/10 complete. Loss: 1.423234
+Step 10/20 of epoch 2/10 complete. Loss: 1.564951
+Step 15/20 of epoch 2/10 complete. Loss: 1.368865
+Step 20/20 of epoch 2/10 complete. Loss: 1.959676
+Saved LoRA checkpoint: ./vstep-lora-1.5B/lora_checkpoint_1.pt
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/val.json
+Limiting dataset from 5438 to 20 samples
+randomly shuffling key-value pairs
+/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/utils/data/dataloader.py:560: UserWarning: This DataLoader will create 8 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+computing validation loss on VSTEP-SpeakingScoring/val
+20it [00:17,  1.14it/s]
+validation loss on VSTEP-SpeakingScoring/val is 1.417
+Running MAE test on 50 samples...
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/val.json
+Limiting dataset from 5438 to 20 samples
+randomly shuffling key-value pairs
+Error processing sample 0: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 1: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 2: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 3: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 4: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 5: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 6: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 7: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 8: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 9: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 10: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 11: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 12: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 13: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 14: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 15: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 16: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 17: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 18: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 19: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+
+=== MAE Results Epoch 2 ===
+mae_grammar: 999.0000
+mae_vocabulary: 999.0000
+mae_discourse: 999.0000
+mae_total: 999.0000
+mae_average: 999.0000
+num_samples: 0.0000
+========================================
+force reblending dataset at epoch 2; reading all dataset files
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/train.json
+Limiting dataset from 10119 to 20 samples
+randomly shuffling key-value pairs
+blending VSTEP-SpeakingScoring/train
+force shuffling at new epoch 2 for dataset VSTEP-SpeakingScoring/train
+randomly shuffling key-value pairs
+writing reblended dataset file to: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-3B/dataset_blending-reblended.json
+num_batches_per_epoch=20, total_training_steps=200
+ 30%|█████████████████████████████▍                                                                    | 60/200 [00:28<03:22,  1.45s/it]
+Step 5/20 of epoch 3/10 complete. Loss: 1.427439
+Step 10/20 of epoch 3/10 complete. Loss: 2.018070
+Step 15/20 of epoch 3/10 complete. Loss: 1.364792
+Step 20/20 of epoch 3/10 complete. Loss: 1.859749
+Saved LoRA checkpoint: ./vstep-lora-1.5B/lora_checkpoint_2.pt
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/val.json
+Limiting dataset from 5438 to 20 samples
+randomly shuffling key-value pairs
+computing validation loss on VSTEP-SpeakingScoring/val
+20it [00:17,  1.15it/s]
+validation loss on VSTEP-SpeakingScoring/val is 1.418
+Running MAE test on 50 samples...
+reading /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance/VSTEP-SpeakingScoring/val.json
+Limiting dataset from 5438 to 20 samples
+randomly shuffling key-value pairs
+Error processing sample 0: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 1: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 2: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 3: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 4: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 5: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 6: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 7: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 8: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 9: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 10: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 11: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 12: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 13: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 14: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 15: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 16: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 17: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 18: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Error processing sample 19: Index put requires the source and destination dtypes match, got Float for the destination and BFloat16 for the source.
+Traceback (most recent call last):
+  File "/home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/train_lora.py", line 526, in <module>
+    main()
+  File "/home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/train_lora.py", line 463, in main
+    mae_metrics, sample_logs = mae_test_epoch(
+  File "/home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/metrics.py", line 121, in mae_test_epoch
+    for idx, batch in enumerate(validloader):
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 633, in __next__
+    data = self._next_data()
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1317, in _next_data
+    self._shutdown_workers()
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1442, in _shutdown_workers
+    w.join(timeout=_utils.MP_STATUS_CHECK_INTERVAL)
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/multiprocessing/process.py", line 149, in join
+    res = self._popen.wait(timeout)
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/multiprocessing/popen_fork.py", line 40, in wait
+    if not wait([self.sentinel], timeout):
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/multiprocessing/connection.py", line 931, in wait
+    ready = selector.select(timeout)
+  File "/home/user01/miniconda3/envs/audioflamingo2/lib/python3.10/selectors.py", line 416, in select
+    fd_event_list = self._selector.poll(timeout)
+KeyboardInterrupt

@@ -5,16 +5,16 @@ train_config:
   batch_size: 1  # Increase since LoRA uses less memory
   gradient_accumulation_steps: 1  # Reduce since we increased batch_size
   seed: 42
-  learning_rate: 0.000002  # Higher LR for LoRA training
+  learning_rate: 0.00005  # Higher LR for LoRA training
   lr_scheduler: linear
   loss_multiplier: 1.0
-  warmup_steps: 200
+  warmup_steps: 500
   weight_decay: 0.01  # Lower weight decay for LoRA
-  precision: amp_bfloat16  # Use bfloat16 for stability
-  gradient_checkpointing: False 
+  precision: amp_bf16  # Use amp_bfloat16 for stability
+  gradient_checkpointing: true 
   num_epochs: 10  # Fewer epochs for LoRA
   offline: false
-  freeze_lm_embeddings: false
+  freeze_lm_embeddings: true
   logging_steps: 5
   dist_backend: null
   dist_url: null
@@ -48,8 +48,8 @@ data_config:
   dataset_file_root: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance
   data_root: /home/user01/aiotlab/sondinh/DATA_Vocal
   dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-3B/dataset_blending.json
-  max_tokens: 2345
-  num_workers: 8  # Reduce for stability
+  max_tokens: 8192
+  num_workers: 6  # Reduce for stability
 
   valid_dataset_config: 
     VSTEP-SpeakingScoring/val: true
@@ -89,3 +89,8 @@ model_config:
     max_window_per_audio: 1,
     common_encoder_embed_dim: 1024
   }
+
+wandb_project: "Flamingo-2-finetune"
+wandb_key: "072fb112587c6b4507f5ec59e575d234c3e22649"
+log_samples: true
+mae_test_samples: 5

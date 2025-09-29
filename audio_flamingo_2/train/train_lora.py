@@ -5,7 +5,10 @@
 #   LICENSE is in incl_licenses directory.
 
 """ LoRA training script for Audio Flamingo - Memory efficient fine-tuning """
-
+import wandb
+import re
+import numpy as np
+from sklearn.metrics import mean_absolute_error
 import argparse
 import functools
 import glob
@@ -38,7 +41,7 @@ from transformers import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-
+from metrics import mae_test_epoch
 # LoRA imports
 from peft import (
     LoraConfig, 
@@ -260,6 +263,21 @@ def main():
     
     random_seed(args.seed)
 
+    if args.rank == 0:  # Only on main process
+        wandb.login(key=config.get('wandb_key'), relogin=True)
+        wandb.init(
+            project=config.get('wandb_project', 'Flamingo-2-finetune'),
+            name=f"{args.run_name}-{args.learning_rate}",
+            config={
+                **config['train_config'],
+                **config['lora_config'],
+                **config['model_config'],
+                'dataset': config['data_config']['dataset_blending_config']
+            },
+            tags=['lora', 'flamingo2', 'vstep']
+        )
+        print("✅ Wandb initialized")
+
     # Initialize model
     print('creating model')
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -275,7 +293,7 @@ def main():
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
@@ -346,8 +364,7 @@ def main():
     optimizer = torch.optim.AdamW(
         trainable_params,
         lr=args.learning_rate,
-        weight_decay=args.weight_decay,
-        eps=1e-6,
+        weight_decay=args.weight_decay
     )
 
     # Load optimizer checkpoint if resuming
@@ -443,15 +460,60 @@ def main():
                     )
 
                 if args.rank == 0:
-                    for key in valid_losses:
-                        tb.add_scalar("Valid/{}".format(key), valid_losses[key], (epoch+1)*len(trainloader))
-            
+                    mae_metrics, sample_logs = mae_test_epoch(
+                        ddp_model.module, data_config, clap_config, tokenizer, device_id, max_samples=50
+                    )
+                    
+                    # Log validation losses to wandb
+                    if wandb.run is not None:
+                        wandb_log = {"epoch": epoch + 1}
+                        
+                        # Add validation losses
+                        for key in valid_losses:
+                            wandb_log[f"valid/{key}"] = valid_losses[key]
+                        
+                        # Add MAE metrics
+                        for key, value in mae_metrics.items():
+                            wandb_log[f"mae/{key}"] = value
+                        
+                        # Log metrics
+                        wandb.log(wandb_log)
+                        
+                        # Log sample predictions as table
+                        if len(sample_logs) > 0:
+                            sample_table = wandb.Table(columns=[
+                                "Audio File", "Prompt", "Ground Truth", "Prediction", 
+                                "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
+                                "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
+                            ])
+                            
+                            for sample in sample_logs:
+                                sample_table.add_data(
+                                    sample['audio_file'],
+                                    sample['prompt'],
+                                    sample['ground_truth'],
+                                    sample['prediction'],
+                                    sample['gt_scores'][0], sample['gt_scores'][1], 
+                                    sample['gt_scores'][2], sample['gt_scores'][3],
+                                    sample['pred_scores'][0], sample['pred_scores'][1],
+                                    sample['pred_scores'][2], sample['pred_scores'][3]
+                                )
+                            
+                            wandb.log({f"samples/epoch_{epoch+1}": sample_table})
+                    
+                    # Print MAE results
+                    print(f"\n=== MAE Results Epoch {epoch+1} ===")
+                    for key, value in mae_metrics.items():
+                        print(f"{key}: {value:.4f}")
+                    print("=" * 40)
+                    
             except Exception as error:
-                print("An exception occurred during validation:", error)
+                print("An exception occurred during validation/MAE:", error)
                 
             if args.world_size > 1:
                 torch.distributed.barrier()
         
+
     # Save final LoRA checkpoint
     save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
     
@@ -462,4 +524,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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

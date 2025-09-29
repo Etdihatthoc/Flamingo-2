@@ -5,6 +5,7 @@
 #   LICENSE is in incl_licenses directory.
 
 import functools
+from importlib.resources import contents
 import io
 import json
 import math
@@ -190,6 +191,21 @@ class AudioTextData(torch.utils.data.Dataset):
         if contents['split_path'] is not None:
             abs_path = contents['split_path']
 
+         # ADD THIS: Limit to first N samples
+        limit_samples = 20
+        if limit_samples is not None:
+            original_total = contents.get('total_num', len(contents['data']))
+            print(f"Limiting dataset from {original_total} to {limit_samples} samples")
+            
+            # Keep only first N items
+            limited_data = {}
+            for i, key in enumerate(sorted(contents['data'].keys())):
+                if i >= limit_samples:
+                    break
+                limited_data[str(i)] = contents['data'][key]
+            
+            contents['data'] = limited_data
+            contents['total_num'] = len(limited_data)
         """
         for normal data
         contents['data'] = {idx: {
@@ -441,7 +457,17 @@ class AudioTextData(torch.utils.data.Dataset):
             text_output = str(item['output']).lower()
 
             sample = f"<audio>{text_prompt.strip()}{self.tokenizer.sep_token}{text_output.strip()}<|endofchunk|>{self.tokenizer.eos_token}"
-
+            
+            # print("=== RAW DATA DEBUG ===")
+            # print(f"text_prompt length: {len(text_prompt)}")
+            # print(f"text_output length: {len(text_output)}")
+            # print(f"text_prompt: {text_prompt[:50]}...")
+            # print(f"text_output: {text_output[:50]}")
+            # print(f"sep_token: '{self.tokenizer.sep_token[:50]}'")
+            # print(f"Full sample length: {len(sample)}")
+            # print(f"Full sample: {sample[:50]}")
+            # print("=====================")
+                
             text = self.tokenizer(
                 sample,
                 max_length=self.max_tokens,

@@ -1,6 +1,6 @@
-[Sat 27 Sep 2025 08:35:53 PM +07] Node: dgx01
-SLURM_JOB_ID=17333  CUDA_VISIBLE_DEVICES=0
-Sat Sep 27 20:35:53 2025       
+[Sun 28 Sep 2025 12:04:51 AM +07] Node: dgx01
+SLURM_JOB_ID=17342  CUDA_VISIBLE_DEVICES=0
+Sun Sep 28 00:04:51 2025       
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 470.141.03   Driver Version: 470.141.03   CUDA Version: 11.4     |
 |-------------------------------+----------------------+----------------------+
@@ -8,8 +8,8 @@ Sat Sep 27 20:35:53 2025
 | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
 |                               |                      |               MIG M. |
 |===============================+======================+======================|
-|   0  NVIDIA A100-SXM...  On   | 00000000:0F:00.0 Off |                    0 |
-| N/A   30C    P0    65W / 400W |      0MiB / 81251MiB |      0%      Default |
+|   0  NVIDIA A100-SXM...  On   | 00000000:07:00.0 Off |                    0 |
+| N/A   31C    P0    65W / 400W |      0MiB / 81251MiB |      0%      Default |
 |                               |                      |             Disabled |
 +-------------------------------+----------------------+----------------------+
                                                                                
@@ -21,5 +21,5 @@ Sat Sep 27 20:35:53 2025
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
 ERROR: Unable to locate a modulefile for 'cuda'
-[Sat 27 Sep 2025 08:35:53 PM +07] Compiling keep_gpu.cu with nvcc...
-[Sat 27 Sep 2025 08:35:54 PM +07] Running keep_gpu...
+[Sun 28 Sep 2025 12:04:51 AM +07] Compiling infer.cu with nvcc...
+[Sun 28 Sep 2025 12:04:52 AM +07] Running infer...
