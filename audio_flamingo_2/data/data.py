@@ -191,21 +191,21 @@ class AudioTextData(torch.utils.data.Dataset):
         if contents['split_path'] is not None:
             abs_path = contents['split_path']
 
-         # ADD THIS: Limit to first N samples
-        limit_samples = 20
-        if limit_samples is not None:
-            original_total = contents.get('total_num', len(contents['data']))
-            print(f"Limiting dataset from {original_total} to {limit_samples} samples")
+        # ADD THIS: Limit to first N samples
+        # limit_samples = 20
+        # if limit_samples is not None:
+        #     original_total = contents.get('total_num', len(contents['data']))
+        #     print(f"Limiting dataset from {original_total} to {limit_samples} samples")
             
-            # Keep only first N items
-            limited_data = {}
-            for i, key in enumerate(sorted(contents['data'].keys())):
-                if i >= limit_samples:
-                    break
-                limited_data[str(i)] = contents['data'][key]
+        #     # Keep only first N items
+        #     limited_data = {}
+        #     for i, key in enumerate(sorted(contents['data'].keys())):
+        #         if i >= limit_samples:
+        #             break
+        #         limited_data[str(i)] = contents['data'][key]
             
-            contents['data'] = limited_data
-            contents['total_num'] = len(limited_data)
+        #     contents['data'] = limited_data
+        #     contents['total_num'] = len(limited_data)
         """
         for normal data
         contents['data'] = {idx: {

@@ -2,20 +2,20 @@ train_config:
   expdir: ./
   run_name: vstep-lora-1.5B
   delete_previous_checkpoint: true 
-  batch_size: 1  # Increase since LoRA uses less memory
+  batch_size: 1 # Increase since LoRA uses less memory
   gradient_accumulation_steps: 1  # Reduce since we increased batch_size
   seed: 42
   learning_rate: 0.00005  # Higher LR for LoRA training
   lr_scheduler: linear
   loss_multiplier: 1.0
-  warmup_steps: 500
+  warmup_steps: 200
   weight_decay: 0.01  # Lower weight decay for LoRA
   precision: amp_bf16  # Use amp_bfloat16 for stability
-  gradient_checkpointing: true 
-  num_epochs: 10  # Fewer epochs for LoRA
+  gradient_checkpointing: false 
+  num_epochs: 1  # Fewer epochs for LoRA
   offline: false
   freeze_lm_embeddings: true
-  logging_steps: 5
+  logging_steps: 10
   dist_backend: null
   dist_url: null
   no_set_device_rank: true
@@ -27,7 +27,7 @@ train_config:
 lora_config:
   r: 16  # LoRA rank
   lora_alpha: 32  # LoRA alpha (typically 2x rank)
-  lora_dropout: 0.1  # LoRA dropout
+  lora_dropout: 0.3  # LoRA dropout
   target_modules: ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]  # Target modules for LoRA
   bias: "none"  # Bias handling
   task_type: "CAUSAL_LM"  # Task type
@@ -52,7 +52,8 @@ data_config:
   num_workers: 6  # Reduce for stability
 
   valid_dataset_config: 
-    VSTEP-SpeakingScoring/val: true
+    #VSTEP-SpeakingScoring/val: true
+    VSTEP-SpeakingScoring/test: true
 
 clap_config:
   method: nvclap-large
@@ -73,14 +74,14 @@ whisper_config:
 
   window_length: 30.0  # seconds
   window_overlap: 0.0  # seconds
-  max_num_window: 1  # 5 minutes
+  max_num_window: 6  # 5 minutes
   max_num_fewshot: 1  # number of fewshot samples (including the final one)
 
 model_config:
   cache_dir: /home/user01/.cache
   lang_encoder_path: Qwen/Qwen2.5-1.5B
   tokenizer_path: Qwen/Qwen2.5-1.5B
-  cross_attn_every_n_layers: 3
+  cross_attn_every_n_layers: 1
   audio_transformer_kwargs: {
     n_head: 8,
     n_layers: 3,
