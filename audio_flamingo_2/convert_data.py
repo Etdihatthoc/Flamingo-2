@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import os
 import librosa
-from prompt_3 import system_prompt
+from prompt_5 import system_prompt
 from tqdm import tqdm
 import pandas as pd
 
@@ -48,12 +48,16 @@ def convert_csv_to_manifest(csv_path, split_name, output_path, data_root, audio_
         prompt = f"{system_prompt}\n\nTranscript: {row['text']}"
         
         # Format the expected output to match your current format
-        total_score = (float(row['grammar']) + float(row['vocabulary']) + float(row['content'])) / 3.0
+        total_score = (float(row['grammar']) + float(row['vocabulary']) + float(row['content']) + float(row['fluency']) + float(row['pronunciation'])) / 5.0
         
+        #round to nearest 0.5
+        total_score = round(total_score * 2) / 2.0
         output = (
-            f"Grammar: {row['grammar']}/10\n"
-            f"Vocabulary: {row['vocabulary']}/10\n"
-            f"Discourse management: {row['content']}/10\n"
+            f"Grammar: {row['grammar']:.1f}/10\n"
+            f"Vocabulary: {row['vocabulary']:.1f}/10\n"
+            f"Pronunciation: {row['pronunciation']:.1f}/10\n"
+            f"Fluency: {row['fluency']:.1f}/10\n"
+            f"Discourse management: {row['content']:.1f}/10\n"
             f"Total: {total_score:.1f}/10"
         )
         
@@ -76,7 +80,7 @@ def convert_csv_to_manifest(csv_path, split_name, output_path, data_root, audio_
 if __name__ == "__main__":
     # Define paths
     data_root = "/home/user01/aiotlab/sondinh/DATA_Vocal"
-    manifest_root = "./data/manifests-balance"
+    manifest_root = "./data/manifests-5categories"
     audio_subdir = ""  # since your audio files are directly in data_root
     
     # Convert train, validation, and test sets

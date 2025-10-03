@@ -15,6 +15,7 @@ import numpy as np
 from torch import nn
 import torchvision.transforms
 import torchaudio.transforms as T
+import torch.nn.functional as F
 
 from transformers import (
     AutoModelForCausalLM,

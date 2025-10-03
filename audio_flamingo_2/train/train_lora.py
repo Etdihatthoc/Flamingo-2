@@ -41,7 +41,7 @@ from transformers import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from metrics import mae_test_epoch
+from metrics import mae_test_epoch, mae_val_epoch
 # LoRA imports
 from peft import (
     LoraConfig, 
@@ -200,9 +200,9 @@ def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
     audio_checkpoint_path = f"{exp_path}/audio_transformer_checkpoint_{epoch}.pt"
     torch.save(audio_transformer_dict, audio_checkpoint_path)
     
-    # Keep only the last 3 checkpoints
+    # Keep only the last 5 checkpoints
     checkpoint_list = glob.glob(f"{exp_path}/lora_checkpoint_*.pt")
-    if len(checkpoint_list) > 3:
+    if len(checkpoint_list) > 5:
         checkpoint_list.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
         for old_ckpt in checkpoint_list[:-3]:
             os.remove(old_ckpt)
@@ -252,7 +252,7 @@ def main():
     if 'MASTER_ADDR' not in os.environ:
         os.environ["MASTER_ADDR"] = "localhost"
     if 'MASTER_PORT' not in os.environ:
-        os.environ["MASTER_PORT"] = "12355"
+        os.environ["MASTER_PORT"] = "12356"
     if 'RANK' not in os.environ:
         os.environ["RANK"] = "0"
     if 'WORLD_SIZE' not in os.environ:
@@ -289,11 +289,12 @@ def main():
         freeze_lm_embeddings=args.freeze_lm_embeddings,
         unfreeze_full_lm=unfreeze_full_lm
     )
-
+    print("✅ Model and tokenizer created")
+    
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
@@ -463,67 +464,68 @@ def main():
                 
                 # NEW: MAE test - Truyền đúng parameters như validation_losses
                 if args.rank == 0:
-                    if epoch < arg.num_epochs - 1:
-                        mae_metrics, sample_logs = mae_test_epoch(
-                            model=ddp_model.module,  # Unwrap DDP
-                            data_config=data_config,
-                            clap_config=clap_config,
-                            tokenizer=tokenizer,
-                            batch_size=args.batch_size,  # Same batch size
-                            autocast=get_autocast(args.precision, cache_enabled=True),  # Pass autocast
-                            cast_dtype=get_cast_dtype(args.precision),  # Pass cast_dtype
-                            device_id=device_id,
-                            max_samples=12325
-                        )
+                    # validation 
+                    mae_metrics, sample_logs = mae_val_epoch(
+                        model=ddp_model.module,  # Unwrap DDP
+                        data_config=data_config,
+                        clap_config=clap_config,
+                        tokenizer=tokenizer,
+                        batch_size=args.batch_size,  # Same batch size
+                        autocast=get_autocast(args.precision, cache_enabled=True),  # Pass autocast
+                        cast_dtype=get_cast_dtype(args.precision),  # Pass cast_dtype
+                        device_id=device_id,
+                        max_samples=5438
+                    )
+                    
+                    # Log to wandb
+                    if wandb.run is not None:
+                        wandb_log = {"epoch": epoch + 1}
                         
-                        # Log to wandb
-                        if wandb.run is not None:
-                            wandb_log = {"epoch": epoch + 1}
-                            
-                            # Add validation losses
-                            for key in valid_losses:
-                                wandb_log[f"valid/{key}"] = valid_losses[key]
-                            
-                            # Add MAE metrics
-                            for key, value in mae_metrics.items():
-                                wandb_log[f"mae/{key}"] = value
-                            
-                            # Log metrics
-                            wandb.log(wandb_log)
-                            
-                            # Log sample predictions as table
-                            if len(sample_logs) > 0:
-                                sample_table = wandb.Table(columns=[
-                                    "Audio File", "Prompt", "Ground Truth", "Prediction", 
-                                    "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
-                                    "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
-                                ])
-                                
-                                for sample in sample_logs:
-                                    sample_table.add_data(
-                                        sample['audio_file'],
-                                        sample['prompt'],
-                                        sample['ground_truth'],
-                                        sample['prediction'],
-                                        sample['gt_scores'][0], sample['gt_scores'][1], 
-                                        sample['gt_scores'][2], sample['gt_scores'][3],
-                                        sample['pred_scores'][0], sample['pred_scores'][1],
-                                        sample['pred_scores'][2], sample['pred_scores'][3]
-                                    )
-                                
-                                wandb.log({f"samples/epoch_{epoch+1}": sample_table})
+                        # Add validation losses
+                        for key in valid_losses:
+                            wandb_log[f"valid/{key}"] = valid_losses[key]
                         
-                        # Print MAE results
-                        print(f"\n{'='*50}")
-                        print(f"MAE Results - Epoch {epoch+1}")
-                        print(f"{'='*50}")
-                        print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
-                        print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
-                        print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
-                        print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
-                        print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
-                        print(f"Samples tested: {mae_metrics['num_samples']}")
-                        print(f"{'='*50}\n")
+                        # Add MAE metrics
+                        for key, value in mae_metrics.items():
+                            wandb_log[f"mae/{key}"] = value
+                        
+                        # Log metrics
+                        wandb.log(wandb_log)
+                        
+                        # Log sample predictions as table
+                        if len(sample_logs) > 0:
+                            sample_table = wandb.Table(columns=[
+                                "Audio File", "Prompt", "Ground Truth", "Prediction", 
+                                "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
+                                "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
+                            ])
+                            
+                            for sample in sample_logs:
+                                sample_table.add_data(
+                                    sample['audio_file'],
+                                    sample['prompt'],
+                                    sample['ground_truth'],
+                                    sample['prediction'],
+                                    sample['gt_scores'][0], sample['gt_scores'][1], 
+                                    sample['gt_scores'][2], sample['gt_scores'][3],
+                                    sample['pred_scores'][0], sample['pred_scores'][1],
+                                    sample['pred_scores'][2], sample['pred_scores'][3]
+                                )
+                            
+                            wandb.log({f"samples/epoch_{epoch+1}": sample_table})
+                    
+                    # Print MAE results
+                    print(f"\n{'='*50}")
+                    print(f"MAE Results - Epoch {epoch+1}")
+                    print(f"{'='*50}")
+                    print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
+                    print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
+                    print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
+                    print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
+                    print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
+                    print(f"Samples tested: {mae_metrics['num_samples']}")
+                    print(f"{'='*50}\n")
+
                     
             except Exception as error:
                 print("An exception occurred during validation/MAE:", error)
@@ -532,6 +534,63 @@ def main():
                 
             if args.world_size > 1:
                 torch.distributed.barrier()
+
+    print("Testing LoRA training (disabled full training for quick test)...")
+    epoch = args.num_epochs - 1  # Set epoch to last for testing
+    mae_metrics, sample_logs = mae_test_epoch(
+                            model=ddp_model.module,  # Unwrap DDP
+                            data_config=data_config,
+                            clap_config=clap_config,
+                            tokenizer=tokenizer,
+                            batch_size=args.batch_size,  # Same batch size
+                            autocast=get_autocast(args.precision, cache_enabled=True),  # Pass autocast
+                            cast_dtype=get_cast_dtype(args.precision),  # Pass cast_dtype
+                            device_id=device_id,
+                            max_samples=12325  # Test on specified number of samples
+                        )
+                        
+    # Log to wandb
+    if wandb.run is not None:
+        wandb_log = {"epoch": epoch + 1}
+        
+        # Add MAE metrics
+        for key, value in mae_metrics.items():
+            wandb_log[f"mae_test/{key}"] = value
+        
+        # Log metrics
+        wandb.log(wandb_log)
+        
+        # Log sample predictions as table
+        if len(sample_logs) > 0:
+            sample_table = wandb.Table(columns=[
+                "Audio File", "Prompt", "Ground Truth", "Prediction", 
+                "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
+                "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
+            ])
+            
+            for sample in sample_logs:
+                sample_table.add_data(
+                    sample['audio_file'],
+                    sample['prompt'],
+                    sample['ground_truth'],
+                    sample['prediction'],
+                    sample['gt_scores'][0], sample['gt_scores'][1], 
+                    sample['gt_scores'][2], sample['gt_scores'][3],
+                    sample['pred_scores'][0], sample['pred_scores'][1],
+                    sample['pred_scores'][2], sample['pred_scores'][3]
+                )
+            
+            wandb.log({f"mae_test/samples/epoch_{epoch+1}": sample_table})
+    
+    # Print MAE results
+    print(f"\n{'='*50}")
+    print(f"MAE Test Results - Epoch {epoch+1}")
+    print(f"{'='*50}")
+    print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
+    print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
+    print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
+    print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
+    print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
 
     # Save final LoRA checkpoint
     save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
@@ -543,4 +602,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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

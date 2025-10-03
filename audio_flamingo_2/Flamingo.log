@@ -1,6 +1,6 @@
-[Sun 28 Sep 2025 12:04:51 AM +07] Node: dgx01
-SLURM_JOB_ID=17342  CUDA_VISIBLE_DEVICES=0
-Sun Sep 28 00:04:51 2025       
+[Thu 02 Oct 2025 01:34:40 AM +07] Node: dgx01
+SLURM_JOB_ID=17511  CUDA_VISIBLE_DEVICES=0
+Thu Oct  2 01:34:40 2025       
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 470.141.03   Driver Version: 470.141.03   CUDA Version: 11.4     |
 |-------------------------------+----------------------+----------------------+
@@ -21,5 +21,6 @@ Sun Sep 28 00:04:51 2025
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
 ERROR: Unable to locate a modulefile for 'cuda'
-[Sun 28 Sep 2025 12:04:51 AM +07] Compiling infer.cu with nvcc...
-[Sun 28 Sep 2025 12:04:52 AM +07] Running infer...
+[Thu 02 Oct 2025 01:34:40 AM +07] Compiling infer.cu with nvcc...
+[Thu 02 Oct 2025 01:34:41 AM +07] Running infer...
+/cm/local/apps/slurm/var/spool/job17511/slurm_script: line 78: 3828332 Bus error               (core dumped) ./infer

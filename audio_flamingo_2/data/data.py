@@ -458,15 +458,15 @@ class AudioTextData(torch.utils.data.Dataset):
 
             sample = f"<audio>{text_prompt.strip()}{self.tokenizer.sep_token}{text_output.strip()}<|endofchunk|>{self.tokenizer.eos_token}"
             
-            # print("=== RAW DATA DEBUG ===")
-            # print(f"text_prompt length: {len(text_prompt)}")
-            # print(f"text_output length: {len(text_output)}")
-            # print(f"text_prompt: {text_prompt[:50]}...")
-            # print(f"text_output: {text_output[:50]}")
-            # print(f"sep_token: '{self.tokenizer.sep_token[:50]}'")
-            # print(f"Full sample length: {len(sample)}")
-            # print(f"Full sample: {sample[:50]}")
-            # print("=====================")
+            print("=== RAW DATA DEBUG ===")
+            print(f"text_prompt length: {len(text_prompt)}")
+            print(f"text_output length: {len(text_output)}")
+            print(f"text_prompt: {text_prompt[:50]}...")
+            print(f"text_output: {text_output}")
+            print(f"sep_token: '{self.tokenizer.sep_token[:50]}'")
+            print(f"Full sample length: {len(sample)}")
+            print(f"Full sample: {sample[:50]}")
+            print("=====================")
                 
             text = self.tokenizer(
                 sample,
