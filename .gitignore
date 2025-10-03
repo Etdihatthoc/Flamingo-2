@@ -8,6 +8,7 @@ audio_flamingo_2/data/manifests-balance/
 audio_flamingo_2/train/vstep-lora-1.5B/
 audio_flamingo_2/train/vstep-lora-3B/
 audio_flamingo_2/train/wandb/
+audio_flamingo_2/data/manifests-5categories/
 audio_flamingo_2/train/afclap_checkpoints/
 audio_flamingo_2/train/hf_model/
 audio_flamingo_2/train/hf_model_3B/
