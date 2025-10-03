@@ -35,8 +35,8 @@ data_config:
   dataset_file_root: dummy
   data_root: dummy
   dataset_blending_output: dummy
-  max_tokens: 1024
-  num_workers: 4
+  max_tokens: 8192
+  num_workers: 8
 
   valid_dataset_config: 
   
@@ -47,9 +47,9 @@ clap_config:
   audio_embed_dim: 2048
   checkpoint: clap_ckpt/epoch_16.pt
 
-  window_length: 10.0  # seconds
+  window_length: 30.0  # seconds
   window_overlap: 0.0  # seconds
-  max_num_window: 12  # 2 minutes
+  max_num_window: 6  # 2 minutes
   max_num_fewshot: 1  # number of fewshot samples (including the final one)
   finetune: true
 
@@ -61,7 +61,7 @@ whisper_config:
 
   window_length: 30.0  # seconds
   window_overlap: 0.0  # seconds
-  max_num_window: 1  # 5 minutes
+  max_num_window: 6  # 5 minutes
   max_num_fewshot: 1  # number of fewshot samples (including the final one)
 
 mert_config:  
@@ -70,9 +70,9 @@ mert_config:
   audio_embed_dim: 1024
   sampling_rate: 24000
 
-  window_length: 10.0  # seconds
+  window_length: 30.0  # seconds
   window_overlap: 0.0  # seconds
-  max_num_window: 1  # 5 minutes
+  max_num_window: 6  # 5 minutes
   max_num_fewshot: 1  # number of fewshot samples (including the final one)
 
 model_config:
