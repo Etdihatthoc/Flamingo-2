@@ -19,6 +19,7 @@ audio_flamingo_2/train/vstep-lora-1.5B
 *.sh
 *.pth
 *.pt
-*.safetensors*.json
+*.safetensors
+*.json
 audio_flamingo_2/data/manifests-5categories/VSTEP-SpeakingScoring/*.json
 audio_flamingo_2/train/vstep-lora-1.5B-3cate/*.json
