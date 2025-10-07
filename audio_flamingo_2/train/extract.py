@@ -13,19 +13,23 @@ import sys
 import os
 
 def extract_scores_from_response(response_text):
-    """Extract scores from model response - same logic as metrics.py"""
+    """Extract scores from model response"""
     default_score = 5.0
     
     try:
         response_text = response_text.lower().strip()
         
-        # Extract grammar score
-        grammar_match = re.search(r'grammar:\s*(\d+\.?\d*)', response_text)
-        grammar_score = float(grammar_match.group(1)) if grammar_match else default_score
-        
         # Extract vocabulary score  
         vocab_match = re.search(r'vocabulary:\s*(\d+\.?\d*)', response_text)
         vocab_score = float(vocab_match.group(1)) if vocab_match else default_score
+
+        # Extract pronunciation score
+        pronunciation_match = re.search(r'pronunciation:\s*(\d+\.?\d*)', response_text)
+        pronunciation_score = float(pronunciation_match.group(1)) if pronunciation_match else default_score
+        
+        # Extract fluency score
+        fluency_match = re.search(r'fluency:\s*(\d+\.?\d*)', response_text)
+        fluency_score = float(fluency_match.group(1)) if fluency_match else default_score
         
         # Extract discourse management score
         discourse_patterns = [
@@ -41,42 +45,51 @@ def extract_scores_from_response(response_text):
                 break
         
         # Calculate total
-        total_score = (grammar_score + vocab_score + discourse_score) / 3.0
-        
+        total_score = (grammar_score + vocab_score + pronunciation_score + 
+                      fluency_score + discourse_score) / 5.0
+        total_score = round(total_score * 2) / 2.0  # Round to nearest 0.5
         # Clamp scores to valid range [0, 10]
-        grammar_score = max(0, min(10, grammar_score))
-        vocab_score = max(0, min(10, vocab_score))
-        discourse_score = max(0, min(10, discourse_score))
-        total_score = max(0, min(10, total_score))
         
-        return grammar_score, vocab_score, discourse_score, total_score
+        total_score = max(0, min(10, total_score))
+        vocab_score = max(0, min(10, vocab_score))
+        grammar_score = max(0, min(10, grammar_score))
+        pronunciation_score = max(0, min(10, pronunciation_score))
+        fluency_score = max(0, min(10, fluency_score))
+        discourse_score = max(0, min(10, discourse_score))
+        
+        
+        return total_score, vocab_score, grammar_score, pronunciation_score, fluency_score, discourse_score
         
     except Exception as e:
         print(f"Score extraction failed: {e}")
-        return default_score, default_score, default_score, default_score
-
+        return default_score, default_score, default_score, default_score, default_score, default_score
 
 def calculate_mae_metrics(predictions, ground_truths):
-    """Calculate MAE for each score component - same logic as metrics.py"""
+    """Calculate MAE for each score component"""
     if len(predictions) != len(ground_truths):
         raise ValueError("Predictions and ground truths must have same length")
     
     # Convert to arrays
-    pred_array = np.array(predictions)  # Shape: (N, 4)
-    gt_array = np.array(ground_truths)   # Shape: (N, 4)
+    pred_array = np.array(predictions)  # Shape: (N, 6)
+    gt_array = np.array(ground_truths)   # Shape: (N, 6)
     
     # Calculate MAE for each component
-    mae_grammar = mean_absolute_error(gt_array[:, 0], pred_array[:, 0])
+    mae_total = mean_absolute_error(gt_array[:, 0], pred_array[:, 0])
     mae_vocab = mean_absolute_error(gt_array[:, 1], pred_array[:, 1])
-    mae_discourse = mean_absolute_error(gt_array[:, 2], pred_array[:, 2])
-    mae_total = mean_absolute_error(gt_array[:, 3], pred_array[:, 3])
-    
+    mae_grammar = mean_absolute_error(gt_array[:, 2], pred_array[:, 2])
+    mae_pronunciation = mean_absolute_error(gt_array[:, 3], pred_array[:, 3])
+    mae_fluency = mean_absolute_error(gt_array[:, 4], pred_array[:, 4])
+    mae_discourse = mean_absolute_error(gt_array[:, 5], pred_array[:, 5])
+
+
     return {
-        'mae_grammar': mae_grammar,
-        'mae_vocabulary': mae_vocab,
-        'mae_discourse': mae_discourse,
         'mae_total': mae_total,
-        'mae_average': (mae_grammar + mae_vocab + mae_discourse) / 3.0
+        'mae_vocabulary': mae_vocab,
+        'mae_grammar': mae_grammar,
+        'mae_pronunciation': mae_pronunciation,
+        'mae_fluency': mae_fluency,
+        'mae_discourse': mae_discourse,
+        'mae_average': (mae_grammar + mae_vocab + mae_pronunciation + mae_fluency + mae_discourse) / 5.0
     }
 
 
@@ -134,12 +147,14 @@ def extract_and_calculate_mae(csv_file_path, output_file=None, corrected_csv_nam
         print("\n" + "="*50)
         print("MAE METRICS RESULTS")
         print("="*50)
-        print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
-        print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
-        print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
-        print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
-        print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
-        print(f"Samples tested: {len(predictions)}")
+        print(f"Total MAE:          {mae_metrics['mae_total']:.4f}")
+        print(f"Vocabulary MAE:     {mae_metrics['mae_vocabulary']:.4f}")
+        print(f"Grammar MAE:        {mae_metrics['mae_grammar']:.4f}")
+        print(f"Pronunciation MAE:  {mae_metrics['mae_pronunciation']:.4f}")
+        print(f"Fluency MAE:        {mae_metrics['mae_fluency']:.4f}")
+        print(f"Discourse MAE:      {mae_metrics['mae_discourse']:.4f}")
+        print(f"Average MAE:        {mae_metrics['mae_average']:.4f}")
+        print(f"Samples tested:     {len(predictions)}")
         print("="*50)
         
         # Create corrected CSV with same structure as original test_result.csv
@@ -148,31 +163,42 @@ def extract_and_calculate_mae(csv_file_path, output_file=None, corrected_csv_nam
             'Prompt': df['Prompt'] if 'Prompt' in df.columns else ["" for _ in range(len(df))],
             'Ground Truth': df['Ground Truth'] if 'Ground Truth' in df.columns else ["" for _ in range(len(df))],
             'Prediction': df['Prediction'] if 'Prediction' in df.columns else ["" for _ in range(len(df))],
-            'GT Grammar': [gt[0] for gt in ground_truths],
-            'GT Vocab': [gt[1] for gt in ground_truths], 
-            'GT Discourse': [gt[2] for gt in ground_truths],
-            'GT Total': [gt[3] for gt in ground_truths],
-            'Pred Grammar': [pred[0] for pred in predictions],
+            'GT Total': [gt[0] for gt in ground_truths],
+            'GT Vocab': [gt[1] for gt in ground_truths],
+            'GT Grammar': [gt[2] for gt in ground_truths],
+            'GT Pronunciation': [gt[3] for gt in ground_truths],
+            'GT Fluency': [gt[4] for gt in ground_truths],
+            'GT Discourse': [gt[5] for gt in ground_truths],
+            'Pred Total': [pred[0] for pred in predictions],
             'Pred Vocab': [pred[1] for pred in predictions],
-            'Pred Discourse': [pred[2] for pred in predictions], 
-            'Pred Total': [pred[3] for pred in predictions]
+            'Pred Grammar': [pred[2] for pred in predictions],
+            'Pred Pronunciation': [pred[3] for pred in predictions],
+            'Pred Fluency': [pred[4] for pred in predictions],
+            'Pred Discourse': [pred[5] for pred in predictions],
+
         })
-        
+
         # Create detailed results dataframe for analysis
         results_df = pd.DataFrame({
             'Audio_File': df['Audio File'] if 'Audio File' in df.columns else range(len(df)),
-            'GT_Grammar': [gt[0] for gt in ground_truths],
-            'GT_Vocabulary': [gt[1] for gt in ground_truths], 
-            'GT_Discourse': [gt[2] for gt in ground_truths],
-            'GT_Total': [gt[3] for gt in ground_truths],
-            'Pred_Grammar': [pred[0] for pred in predictions],
+            'GT_Total': [gt[0] for gt in ground_truths],
+            'GT_Vocabulary': [gt[1] for gt in ground_truths],
+            'GT_Grammar': [gt[2] for gt in ground_truths],
+            'GT_Pronunciation': [gt[3] for gt in ground_truths],
+            'GT_Fluency': [gt[4] for gt in ground_truths],
+            'GT_Discourse': [gt[5] for gt in ground_truths],
+            'Pred_Total': [pred[0] for pred in predictions],
             'Pred_Vocabulary': [pred[1] for pred in predictions],
-            'Pred_Discourse': [pred[2] for pred in predictions], 
-            'Pred_Total': [pred[3] for pred in predictions],
-            'Grammar_Error': [abs(gt[0] - pred[0]) for gt, pred in zip(ground_truths, predictions)],
+            'Pred_Grammar': [pred[2] for pred in predictions],
+            'Pred_Pronunciation': [pred[3] for pred in predictions],
+            'Pred_Fluency': [pred[4] for pred in predictions],
+            'Pred_Discourse': [pred[5] for pred in predictions],
+            'Total_Error': [abs(gt[0] - pred[0]) for gt, pred in zip(ground_truths, predictions)],
             'Vocabulary_Error': [abs(gt[1] - pred[1]) for gt, pred in zip(ground_truths, predictions)],
-            'Discourse_Error': [abs(gt[2] - pred[2]) for gt, pred in zip(ground_truths, predictions)],
-            'Total_Error': [abs(gt[3] - pred[3]) for gt, pred in zip(ground_truths, predictions)]
+            'Grammar_Error': [abs(gt[2] - pred[2]) for gt, pred in zip(ground_truths, predictions)],
+            'Pronunciation_Error': [abs(gt[3] - pred[3]) for gt, pred in zip(ground_truths, predictions)],
+            'Fluency_Error': [abs(gt[4] - pred[4]) for gt, pred in zip(ground_truths, predictions)],
+            'Discourse_Error': [abs(gt[5] - pred[5]) for gt, pred in zip(ground_truths, predictions)],
         })
         
         # Save corrected CSV with same structure as original
@@ -189,10 +215,12 @@ def extract_and_calculate_mae(csv_file_path, output_file=None, corrected_csv_nam
         with open(summary_file, 'w') as f:
             f.write("MAE METRICS SUMMARY\n")
             f.write("="*50 + "\n")
-            f.write(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}\n")
-            f.write(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}\n")
-            f.write(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}\n")
             f.write(f"Total MAE:      {mae_metrics['mae_total']:.4f}\n")
+            f.write(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}\n")
+            f.write(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}\n")
+            f.write(f"Pronunciation MAE: {mae_metrics['mae_pronunciation']:.4f}\n")
+            f.write(f"Fluency MAE:   {mae_metrics['mae_fluency']:.4f}\n")
+            f.write(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}\n")
             f.write(f"Average MAE:    {mae_metrics['mae_average']:.4f}\n")
             f.write(f"Samples tested: {len(predictions)}\n")
             f.write(f"Failed extractions: {failed_extractions}\n")

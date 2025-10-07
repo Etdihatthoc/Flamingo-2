@@ -192,7 +192,7 @@ class AudioTextData(torch.utils.data.Dataset):
             abs_path = contents['split_path']
 
         # ADD THIS: Limit to first N samples
-        # limit_samples = 20
+        # limit_samples = 100
         # if limit_samples is not None:
         #     original_total = contents.get('total_num', len(contents['data']))
         #     print(f"Limiting dataset from {original_total} to {limit_samples} samples")
@@ -458,15 +458,15 @@ class AudioTextData(torch.utils.data.Dataset):
 
             sample = f"<audio>{text_prompt.strip()}{self.tokenizer.sep_token}{text_output.strip()}<|endofchunk|>{self.tokenizer.eos_token}"
             
-            print("=== RAW DATA DEBUG ===")
-            print(f"text_prompt length: {len(text_prompt)}")
-            print(f"text_output length: {len(text_output)}")
-            print(f"text_prompt: {text_prompt[:50]}...")
-            print(f"text_output: {text_output}")
-            print(f"sep_token: '{self.tokenizer.sep_token[:50]}'")
-            print(f"Full sample length: {len(sample)}")
-            print(f"Full sample: {sample[:50]}")
-            print("=====================")
+            # print("=== RAW DATA DEBUG ===")
+            # print(f"text_prompt length: {len(text_prompt)}")
+            # print(f"text_output length: {len(text_output)}")
+            # print(f"text_prompt: {text_prompt[:50]}...")
+            # print(f"text_output: {text_output[:50]}")
+            # print(f"sep_token: '{self.tokenizer.sep_token[:50]}'")
+            # print(f"Full sample length: {len(sample)}")
+            # print(f"Full sample: {sample[:50]}")
+            # print("=====================")
                 
             text = self.tokenizer(
                 sample,
@@ -523,7 +523,7 @@ class AudioTextData(torch.utils.data.Dataset):
             return len(list(self.data['data'].keys()))
 
         elif self.split == 'val':
-            return min(len(list(self.valid_data['data'].keys())), 64)
+            return len(list(self.valid_data['data'].keys()))
 
         elif self.split == 'test':
             return len(list(self.valid_data['data'].keys()))
@@ -566,10 +566,53 @@ def get_audiotext_dataloader(data_config, clap_config, text_tokenizer, batch_siz
         )
         return DataInfo(dataset=trainset, dataloader=trainloader, sampler=sampler)
     
+    # elif split in ['val', 'test']:
+    #     all_DataInfo = {}
+    #     for valid_dataset_name in list(data_config["valid_dataset_config"].keys()):
+    #         valid_dataset_name = valid_dataset_name.strip()
+    #         validset = AudioTextData(
+    #             **data_config, 
+    #             clap_config=clap_config,
+    #             tokenizer=text_tokenizer, 
+    #             split=split, 
+    #             valid_dataset_name=valid_dataset_name
+    #         )
+    #         if split == 'val':
+    #             # distributed sampler
+    #             all_DataInfo[valid_dataset_name] = DataInfo(
+    #                 dataset=validset,
+    #                 dataloader=DataLoader(
+    #                     validset, 
+    #                     sampler=DistributedSampler(validset, shuffle=False),
+    #                     batch_size=batch_size, 
+    #                     shuffle=dataloader_shuffle, 
+    #                     collate_fn=data_collator, 
+    #                     num_workers=data_config["num_workers"]
+    #             ))
+    #         else:
+    #             # single GPU
+    #             all_DataInfo[valid_dataset_name] = DataInfo(
+    #                 dataset=validset,
+    #                 dataloader=DataLoader(
+    #                     validset, 
+    #                     batch_size=batch_size, 
+    #                     shuffle=dataloader_shuffle, 
+    #                     collate_fn=data_collator, 
+    #                     num_workers=data_config["num_workers"]
+    #             ))
+
+    #     return all_DataInfo
     elif split in ['val', 'test']:
         all_DataInfo = {}
         for valid_dataset_name in list(data_config["valid_dataset_config"].keys()):
             valid_dataset_name = valid_dataset_name.strip()
+            
+            # Chỉ tạo dataloader cho dataset phù hợp với split hiện tại
+            if split == 'val' and not valid_dataset_name.endswith('/val'):
+                continue
+            elif split == 'test' and not valid_dataset_name.endswith('/test'):
+                continue
+                
             validset = AudioTextData(
                 **data_config, 
                 clap_config=clap_config,
@@ -600,7 +643,7 @@ def get_audiotext_dataloader(data_config, clap_config, text_tokenizer, batch_siz
                         collate_fn=data_collator, 
                         num_workers=data_config["num_workers"]
                 ))
-
+    
         return all_DataInfo
     
 

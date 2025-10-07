@@ -1,8 +1,8 @@
 train_config:
   expdir: ./
-  run_name: vstep-lora-1.5B
+  run_name: vstep-lora-1.5B-3cate #vstep-lora-1.5B
   delete_previous_checkpoint: true 
-  batch_size: 4 # Increase since LoRA uses less memory
+  batch_size: 1 # Increase since LoRA uses less memory
   gradient_accumulation_steps: 1  # Reduce since we increased batch_size
   seed: 42
   learning_rate: 0.00005  # Higher LR for LoRA training
@@ -12,7 +12,7 @@ train_config:
   weight_decay: 0.01  # Lower weight decay for LoRA
   precision: amp_bf16  # Use amp_bfloat16 for stability
   gradient_checkpointing: false 
-  num_epochs: 3  # Fewer epochs for LoRA
+  num_epochs: 5  # Fewer epochs for LoRA
   offline: false
   freeze_lm_embeddings: true
   logging_steps: 10
@@ -47,13 +47,13 @@ data_config:
 
   dataset_file_root: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/data/manifests-balance
   data_root: /home/user01/aiotlab/sondinh/DATA_Vocal
-  dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-1.5B/dataset_blending.json
-  max_tokens: 12000
+  dataset_blending_output: /home/user01/aiotlab/sondinh/Flamingo/audio-flamingo/audio_flamingo_2/train/vstep-lora-1.5B-3cate/dataset_blending.json
+  max_tokens: 20000
   num_workers: 6  # Reduce for stability
 
   valid_dataset_config: 
-    #VSTEP-SpeakingScoring/val: true
-    VSTEP-SpeakingScoring/test: true
+    VSTEP-SpeakingScoring/val: true
+    #VSTEP-SpeakingScoring/test: false
 
 clap_config:
   method: nvclap-large

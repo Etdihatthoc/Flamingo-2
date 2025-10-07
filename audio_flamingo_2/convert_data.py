@@ -53,12 +53,12 @@ def convert_csv_to_manifest(csv_path, split_name, output_path, data_root, audio_
         #round to nearest 0.5
         total_score = round(total_score * 2) / 2.0
         output = (
-            f"Grammar: {row['grammar']:.1f}/10\n"
+            f"Total: {total_score:.1f}/10\n"
             f"Vocabulary: {row['vocabulary']:.1f}/10\n"
+            f"Grammar: {row['grammar']:.1f}/10\n"
             f"Pronunciation: {row['pronunciation']:.1f}/10\n"
             f"Fluency: {row['fluency']:.1f}/10\n"
             f"Discourse management: {row['content']:.1f}/10\n"
-            f"Total: {total_score:.1f}/10"
         )
         
         # Add to manifest

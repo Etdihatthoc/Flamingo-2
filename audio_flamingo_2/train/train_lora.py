@@ -267,7 +267,8 @@ def main():
         wandb.login(key=config.get('wandb_key'), relogin=True)
         wandb.init(
             project=config.get('wandb_project', 'Flamingo-2-finetune'),
-            name=f"{args.run_name}-{args.learning_rate}",
+            name=f"{args.run_name}-test",
+            #dir='/home/user06/sondinh/Flamingo/wandb',
             config={
                 **config['train_config'],
                 **config['lora_config'],
@@ -298,6 +299,11 @@ def main():
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
+
+    # Freeze model
+    with torch.no_grad():
+        for param in model.parameters():
+            param.requires_grad = False
 
     # Setup LoRA configuration
     peft_config = LoraConfig(
@@ -416,7 +422,7 @@ def main():
 
     print('start LoRA training from epoch {}'.format(resume_from_epoch))
     for epoch in range(resume_from_epoch, args.num_epochs):
-        # Force reblending dataset for every epoch
+        #Force reblending dataset for every epoch
         if epoch > 0:
             AudioTextDataInfo = get_audiotext_dataloader(
                 data_config, clap_config, tokenizer, args.batch_size, split='train',
@@ -496,8 +502,8 @@ def main():
                         if len(sample_logs) > 0:
                             sample_table = wandb.Table(columns=[
                                 "Audio File", "Prompt", "Ground Truth", "Prediction", 
-                                "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
-                                "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
+                                "GT Total", "GT Vocab", "GT Grammar", "GT Pronunciation", "GT Fluency", "GT Discourse", 
+                                 "Pred Total", "Pred Vocab", "Pred Grammar", "Pred Pronunciation", "Pred Fluency", "Pred Discourse"
                             ])
                             
                             for sample in sample_logs:
@@ -506,10 +512,10 @@ def main():
                                     sample['prompt'],
                                     sample['ground_truth'],
                                     sample['prediction'],
-                                    sample['gt_scores'][0], sample['gt_scores'][1], 
-                                    sample['gt_scores'][2], sample['gt_scores'][3],
-                                    sample['pred_scores'][0], sample['pred_scores'][1],
-                                    sample['pred_scores'][2], sample['pred_scores'][3]
+                                    sample['gt_scores'][0], sample['gt_scores'][1], sample['gt_scores'][2], 
+                                    sample['gt_scores'][3], sample['gt_scores'][4], sample['gt_scores'][5],
+                                    sample['pred_scores'][0], sample['pred_scores'][1], sample['pred_scores'][2],
+                                    sample['pred_scores'][3], sample['pred_scores'][4], sample['pred_scores'][5]
                                 )
                             
                             wandb.log({f"samples/epoch_{epoch+1}": sample_table})
@@ -518,12 +524,14 @@ def main():
                     print(f"\n{'='*50}")
                     print(f"MAE Results - Epoch {epoch+1}")
                     print(f"{'='*50}")
-                    print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
-                    print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
-                    print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
-                    print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
-                    print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
-                    print(f"Samples tested: {mae_metrics['num_samples']}")
+                    print(f"Total MAE:          {mae_metrics['mae_total']:.4f}")
+                    print(f"Vocab MAE:        {mae_metrics['mae_vocabulary']:.4f}")
+                    print(f"Grammar MAE:     {mae_metrics['mae_grammar']:.4f}")
+                    print(f"Pronunciation MAE:  {mae_metrics['mae_pronunciation']:.4f}")
+                    print(f"Fluency MAE:        {mae_metrics['mae_fluency']:.4f}")
+                    print(f"Discourse MAE:      {mae_metrics['mae_discourse']:.4f}")
+                    print(f"Average MAE:        {mae_metrics['mae_average']:.4f}")
+                    print(f"Samples tested:     {mae_metrics['num_samples']}")
                     print(f"{'='*50}\n")
 
                     
@@ -564,8 +572,8 @@ def main():
         if len(sample_logs) > 0:
             sample_table = wandb.Table(columns=[
                 "Audio File", "Prompt", "Ground Truth", "Prediction", 
-                "GT Grammar", "GT Vocab", "GT Discourse", "GT Total",
-                "Pred Grammar", "Pred Vocab", "Pred Discourse", "Pred Total"
+                "GT Total", "GT Vocabulary", "GT Grammar", "GT Pronunciation", "GT Fluency", "GT Discourse",
+                "Pred Total", "Pred Vocabulary", "Pred Grammar", "Pred Pronunciation", "Pred Fluency", "Pred Discourse"
             ])
             
             for sample in sample_logs:
@@ -574,26 +582,28 @@ def main():
                     sample['prompt'],
                     sample['ground_truth'],
                     sample['prediction'],
-                    sample['gt_scores'][0], sample['gt_scores'][1], 
-                    sample['gt_scores'][2], sample['gt_scores'][3],
-                    sample['pred_scores'][0], sample['pred_scores'][1],
-                    sample['pred_scores'][2], sample['pred_scores'][3]
+                    sample['gt_scores'][0], sample['gt_scores'][1], sample['gt_scores'][2], 
+                    sample['gt_scores'][3], sample['gt_scores'][4], sample['gt_scores'][5],
+                    sample['pred_scores'][0], sample['pred_scores'][1], sample['pred_scores'][2],
+                    sample['pred_scores'][3], sample['pred_scores'][4], sample['pred_scores'][5]
                 )
             
-            wandb.log({f"mae_test/samples/epoch_{epoch+1}": sample_table})
+            wandb.log({f"samples/epoch_{epoch+1}": sample_table})
     
     # Print MAE results
     print(f"\n{'='*50}")
     print(f"MAE Test Results - Epoch {epoch+1}")
     print(f"{'='*50}")
-    print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
-    print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
-    print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
     print(f"Total MAE:      {mae_metrics['mae_total']:.4f}")
+    print(f"Vocabulary MAE: {mae_metrics['mae_vocabulary']:.4f}")
+    print(f"Grammar MAE:    {mae_metrics['mae_grammar']:.4f}")
+    print(f"Discourse MAE:  {mae_metrics['mae_discourse']:.4f}")
+    print(f"Pronunciation MAE: {mae_metrics['mae_pronunciation']:.4f}")
+    print(f"Fluency MAE:    {mae_metrics['mae_fluency']:.4f}")
     print(f"Average MAE:    {mae_metrics['mae_average']:.4f}")
 
     # Save final LoRA checkpoint
-    save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
+    #save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
     
     if args.rank == 0:
         tb.close()
@@ -603,3 +613,4 @@ def main():
 if __name__ == "__main__":
     main()
     #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
+    #17611

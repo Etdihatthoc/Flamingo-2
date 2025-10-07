@@ -12,13 +12,21 @@ def extract_scores_from_response(response_text):
     try:
         response_text = response_text.lower().strip()
         
+        # Extract vocabulary score  
+        vocab_match = re.search(r'vocabulary:\s*(\d+\.?\d*)', response_text)
+        vocab_score = float(vocab_match.group(1)) if vocab_match else default_score
+
         # Extract grammar score
         grammar_match = re.search(r'grammar:\s*(\d+\.?\d*)', response_text)
         grammar_score = float(grammar_match.group(1)) if grammar_match else default_score
         
-        # Extract vocabulary score  
-        vocab_match = re.search(r'vocabulary:\s*(\d+\.?\d*)', response_text)
-        vocab_score = float(vocab_match.group(1)) if vocab_match else default_score
+        # Extract pronunciation score
+        pronunciation_match = re.search(r'pronunciation:\s*(\d+\.?\d*)', response_text)
+        pronunciation_score = float(pronunciation_match.group(1)) if pronunciation_match else default_score
+        
+        # Extract fluency score
+        fluency_match = re.search(r'fluency:\s*(\d+\.?\d*)', response_text)
+        fluency_score = float(fluency_match.group(1)) if fluency_match else default_score
         
         # Extract discourse management score
         discourse_patterns = [
@@ -34,20 +42,25 @@ def extract_scores_from_response(response_text):
                 break
         
         # Calculate total
-        total_score = (grammar_score + vocab_score + discourse_score) / 3.0
+        total_score = (grammar_score + vocab_score + pronunciation_score + 
+                      fluency_score + discourse_score) / 5.0
         
+        total_score = round(total_score * 2) / 2.0
         # Clamp scores to valid range [0, 10]
-        grammar_score = max(0, min(10, grammar_score))
-        vocab_score = max(0, min(10, vocab_score))
-        discourse_score = max(0, min(10, discourse_score))
-        total_score = max(0, min(10, total_score))
         
-        return grammar_score, vocab_score, discourse_score, total_score
+        total_score = max(0, min(10, total_score))
+        vocab_score = max(0, min(10, vocab_score))
+        grammar_score = max(0, min(10, grammar_score))
+        pronunciation_score = max(0, min(10, pronunciation_score))
+        fluency_score = max(0, min(10, fluency_score))
+        discourse_score = max(0, min(10, discourse_score))
+        
+        
+        return total_score, vocab_score , grammar_score, pronunciation_score, fluency_score, discourse_score
         
     except Exception as e:
         print(f"Score extraction failed: {e}")
-        return default_score, default_score, default_score, default_score
-
+        return default_score, default_score, default_score, default_score, default_score, default_score
 
 def calculate_mae_metrics(predictions, ground_truths):
     """Calculate MAE for each score component"""
@@ -55,21 +68,26 @@ def calculate_mae_metrics(predictions, ground_truths):
         raise ValueError("Predictions and ground truths must have same length")
     
     # Convert to arrays
-    pred_array = np.array(predictions)  # Shape: (N, 4)
-    gt_array = np.array(ground_truths)   # Shape: (N, 4)
+    pred_array = np.array(predictions)  # Shape: (N, 6)
+    gt_array = np.array(ground_truths)   # Shape: (N, 6)
     
     # Calculate MAE for each component
-    mae_grammar = mean_absolute_error(gt_array[:, 0], pred_array[:, 0])
+    mae_total = mean_absolute_error(gt_array[:, 0], pred_array[:, 0])
     mae_vocab = mean_absolute_error(gt_array[:, 1], pred_array[:, 1])
-    mae_discourse = mean_absolute_error(gt_array[:, 2], pred_array[:, 2])
-    mae_total = mean_absolute_error(gt_array[:, 3], pred_array[:, 3])
+    mae_grammar = mean_absolute_error(gt_array[:, 2], pred_array[:, 2])
+    mae_pronunciation = mean_absolute_error(gt_array[:, 3], pred_array[:, 3])
+    mae_fluency = mean_absolute_error(gt_array[:, 4], pred_array[:, 4])
+    mae_discourse = mean_absolute_error(gt_array[:, 5], pred_array[:, 5])
+
     
     return {
-        'mae_grammar': mae_grammar,
-        'mae_vocabulary': mae_vocab,
-        'mae_discourse': mae_discourse,
         'mae_total': mae_total,
-        'mae_average': (mae_grammar + mae_vocab + mae_discourse) / 3.0
+        'mae_vocabulary': mae_vocab,
+        'mae_grammar': mae_grammar,
+        'mae_pronunciation': mae_pronunciation,
+        'mae_fluency': mae_fluency,
+        'mae_discourse': mae_discourse,
+        'mae_average': (mae_grammar + mae_vocab + mae_pronunciation + mae_fluency + mae_discourse) / 5.0
     }
 
 
@@ -192,23 +210,32 @@ def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autoca
             if len(sep_positions) > 0:
                 sep_pos = sep_positions[-1].item()
                 # Get predicted tokens after SEP
-                pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
+                # pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
+                
+                # # Decode prediction
+                # pred_text = tokenizer.decode(pred_tokens_after_sep)
+                # pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
+                pred_logits_after_sep = output.logits[0, sep_pos:-1, :]  # -1 because last logit predicts beyond sequence
+                pred_tokens_after_sep = torch.argmax(pred_logits_after_sep, dim=-1)
                 
                 # Decode prediction
                 pred_text = tokenizer.decode(pred_tokens_after_sep)
                 pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
             else:
                 continue
-            
+
+            # print(f"Predicted text: ({pred_text})")
+            # print(f"Ground truth text: ({ground_truth_text})")
+
             # Extract scores from both prediction and ground truth
             pred_scores = extract_scores_from_response(pred_text)
             gt_scores = extract_scores_from_response(ground_truth_text)
             
             predictions.append(pred_scores)
             ground_truths.append(gt_scores)
-            
-            # Save samples for logging (first 20 samples)
-            if len(sample_logs) < 20:
+
+            # Save samples for logging (first 5438 samples)
+            if len(sample_logs) < 5438:
                 filename = filenames[0] if isinstance(filenames[0], str) else filenames[0][0]
                 sample_logs.append({
                     'audio_file': filename,
@@ -233,10 +260,12 @@ def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autoca
         mae_metrics['num_samples'] = len(predictions)
     else:
         mae_metrics = {
-            'mae_grammar': 999.0,
-            'mae_vocabulary': 999.0, 
-            'mae_discourse': 999.0,
             'mae_total': 999.0,
+            'mae_vocabulary': 999.0,
+            'mae_grammar': 999.0,
+            'mae_pronunciation': 999.0,
+            'mae_fluency': 999.0,
+            'mae_discourse': 999.0,
             'mae_average': 999.0,
             'num_samples': 0
         }
@@ -362,7 +391,13 @@ def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autoc
             if len(sep_positions) > 0:
                 sep_pos = sep_positions[-1].item()
                 # Get predicted tokens after SEP
-                pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
+                # pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
+                
+                # # Decode prediction
+                # pred_text = tokenizer.decode(pred_tokens_after_sep)
+                # pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
+                pred_logits_after_sep = output.logits[0, sep_pos:-1, :]  # -1 because last logit predicts beyond sequence
+                pred_tokens_after_sep = torch.argmax(pred_logits_after_sep, dim=-1)
                 
                 # Decode prediction
                 pred_text = tokenizer.decode(pred_tokens_after_sep)
@@ -403,10 +438,12 @@ def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autoc
         mae_metrics['num_samples'] = len(predictions)
     else:
         mae_metrics = {
-            'mae_grammar': 999.0,
-            'mae_vocabulary': 999.0, 
-            'mae_discourse': 999.0,
             'mae_total': 999.0,
+            'mae_vocabulary': 999.0,
+            'mae_grammar': 999.0,
+            'mae_pronunciation': 999.0,
+            'mae_fluency': 999.0,
+            'mae_discourse': 999.0,
             'mae_average': 999.0,
             'num_samples': 0
         }

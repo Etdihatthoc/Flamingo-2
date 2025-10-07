@@ -275,12 +275,8 @@ Your task is to evaluate a candidate's spoken response based on the provided aud
         Band 9: Generally coherently develops ideas with elaborated details and examples and can round off with an appropriate conclusion. Produces clear, smoothly flowing, well-structured speech, showing rather efficient and controlled use of organizational patterns, connectors, and cohesive devices.
         Band 10: Coherently and easily develops ideas with elaborated details and examples and can round off with an appropriate conclusion. Produces clear, smoothly flowing, well-structured speech, showing efficient and controlled use of organizational patterns, connectors, and cohesive devices.
 
-* Scoring System
-    - Each category is rated on a scale from 0 to 10 (step = 0.5) based on the official VSTEP Speaking Rating Scales. 
-    - Provide a score for each category along with a detailed explanation of why the candidate received that score. 
-    - The final score is the average of all five category scores.
-
 * Evaluation Considerations
+    - Each category is rated on a scale from 0 to 10 (step = 0.5) based on the official VSTEP Speaking Rating Scales. 
     - Compare the transcript with the VSTEP Speaking Rating Scales. 
     - Identify key errors, strengths, and weaknesses in each category. 
     - Justify the scores based on specific examples from the transcript.
@@ -298,9 +294,7 @@ Your task is to evaluate a candidate's spoken response based on the provided aud
     
     Note:Total = (Sum of all score / 5) = 8.6/10 ===> 8.5 (Final Score rounding to 0.5)
 
-* Example response:
-    Transcript:  So I'm going to talk about how Facebook is a useful tool for students. So as we may know that Facebook is a very popular social networking site. And to the young people, they can provide great help. So the first thing that, the first benefit of Facebook is that it can provide a rich source of information. So by following the pages on Facebook, the people can, the students can get like information pop up on their news feed every day. And those pieces of information are delivered in bite signs, which means that it's not too long. So the students may find it easier to take in the information in contrast to long lectures that they find on the videos on other platforms. And also it can provide a different way of learning for people on Facebook can create different kind of groups. And in those groups, they can share information with each other. They can share the tips for starting or they can share different resources. And it can also be a means of entertainment after a long period of time spent for starting. The students can go on Facebook and watch funny videos or they can talk with their friends or they can comment on their friends' photos. So I think that all of Facebook is a tool that can be very effective for students. So talking about some of the following follow up questions here. So what are the negative influences of Facebook? So one thing that people usually talk about is that social media, especially like Facebook, can cause addiction. And people tend to scroll continuously without noticing the time. And that would be very time consuming and it would take a lot of time away from productive activities. Another problem that Facebook may have is that it provides videos and posts that require shorter attention from the users. So the user will tend to just read the short posts and short videos. So they may find it harder to concentrate if they have to engage with a more difficult task that requires a longer period of time. So the second question is that definitely the number of Facebook users have changed over the last 10 years in my country. So as I remember 10 years ago, people tend to use another platform like Yahoo. But within these maybe 5 years, the number of Facebook users increased significantly.
-    
+* Example response:    
     Response:
         Grammar: 9.0/10
         Vocabulary: 9.0/10
@@ -309,5 +303,4 @@ Your task is to evaluate a candidate's spoken response based on the provided aud
         Discourse Management: 8.0/10
         Total: 8.5/10
 
-* Note: Do not scoring so strictly. The candidate's performance should be evaluated holistically, considering both strengths and areas for improvement. Provide constructive feedback to help the candidate enhance their spoken English skills.
 ==> Response audio and transcript are given:"""
