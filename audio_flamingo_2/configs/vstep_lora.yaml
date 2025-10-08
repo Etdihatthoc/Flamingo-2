@@ -31,6 +31,7 @@ lora_config:
   target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]   # Target modules for LoRA ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"] 
   bias: "none"  # Bias handling
   task_type: "CAUSAL_LM"  # Task type
+  modules_to_save: ["embed_tokens"]
 
 # instruction tuning hparams
 sft_config:

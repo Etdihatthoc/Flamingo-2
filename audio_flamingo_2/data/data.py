@@ -192,7 +192,7 @@ class AudioTextData(torch.utils.data.Dataset):
             abs_path = contents['split_path']
 
         # ADD THIS: Limit to first N samples
-        limit_samples = 1000
+        limit_samples = 20
         if limit_samples is not None:
             original_total = contents.get('total_num', len(contents['data']))
             print(f"Limiting dataset from {original_total} to {limit_samples} samples")

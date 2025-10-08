@@ -5,6 +5,7 @@
 #   LICENSE is in incl_licenses directory.
 
 """ LoRA training script for Audio Flamingo - Memory efficient fine-tuning """
+from pyexpat import model
 import wandb
 import re
 import numpy as np
@@ -41,7 +42,7 @@ from transformers import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from metrics import mae_test_epoch, mae_val_epoch
+from metrics_new import mae_test_epoch, mae_val_epoch
 # LoRA imports
 from peft import (
     LoraConfig, 
@@ -211,39 +212,26 @@ def setup_lora_trainable_params(model, lora_config):
 #                 os.remove(audio_ckpt)
 
 def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
-    """Save LoRA checkpoint WITH EMBEDDINGS - FIXED VERSION"""
+    """Save LoRA checkpoint với ĐẦY ĐỦ trainable components"""
     if args.rank != 0:
         return
         
     exp_path = os.path.join(args.expdir, args.run_name)
     
-    # Get LoRA state dict
-    lora_state = get_peft_model_state_dict(model.lang_encoder)
-    
-    # ✅ FIX: ALSO SAVE EMBEDDING LAYER!
-    # Get the full embedding weights (includes special tokens)
-    embedding_state = {
-        "embed_tokens.weight": model.lang_encoder.get_input_embeddings().weight.data.clone()
-    }
-    
-    # If model has output embeddings (lm_head), save it too
-    if hasattr(model.lang_encoder, 'lm_head'):
-        embedding_state["lm_head.weight"] = model.lang_encoder.lm_head.weight.data.clone()
-    
+    # ✅ CÁCH 1: Lưu TOÀN BỘ lang_encoder state (khuyến nghị)
     checkpoint_dict = {
         "epoch": epoch,
-        "model_state_dict": lora_state,  # LoRA weights
-        "embedding_state_dict": embedding_state,  # ✅ NEW: Embedding weights
+        "model_state_dict": model.lang_encoder.state_dict(),  # ← ĐỔI DÒNG NÀY!
         "optimizer_state_dict": optimizer.state_dict(),
         "lr_scheduler_state_dict": lr_scheduler.state_dict(),
     }
     
-    # Save current checkpoint
+    # Save checkpoint
     checkpoint_path = f"{exp_path}/lora_checkpoint_{epoch}.pt"
     torch.save(checkpoint_dict, checkpoint_path)
-    print(f"Saved LoRA checkpoint with embeddings: {checkpoint_path}")
+    print(f"Saved FULL LoRA checkpoint: {checkpoint_path}")
     
-    # Also save the full audio_transformer_clap state
+    # Also save audio_transformer_clap separately
     audio_transformer_dict = {
         "audio_transformer_clap": model.audio_transformer_clap.state_dict(),
         "epoch": epoch
@@ -251,15 +239,15 @@ def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
     audio_checkpoint_path = f"{exp_path}/audio_transformer_checkpoint_{epoch}.pt"
     torch.save(audio_transformer_dict, audio_checkpoint_path)
     
-    # Keep only the last 5 checkpoints
+    # Keep only last 5 checkpoints
     checkpoint_list = glob.glob(f"{exp_path}/lora_checkpoint_*.pt")
     if len(checkpoint_list) > 5:
         checkpoint_list.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
         for old_ckpt in checkpoint_list[:-5]:
             os.remove(old_ckpt)
-            audio_ckpt = old_ckpt.replace("lora_checkpoint_", "audio_transformer_checkpoint_")
-            if os.path.exists(audio_ckpt):
-                os.remove(audio_ckpt)
+            old_audio = old_ckpt.replace("lora_checkpoint_", "audio_transformer_checkpoint_")
+            if os.path.exists(old_audio):
+                os.remove(old_audio)
  
 
 def random_seed(seed=42, rank=0):
@@ -403,7 +391,7 @@ def main():
         # Load LoRA checkpoint
         checkpoint = torch.load(resume_from_checkpoint, map_location="cpu")
         resume_from_epoch = checkpoint["epoch"] + 1
-        
+
         # Load LoRA weights
         model.lang_encoder.load_state_dict(checkpoint["model_state_dict"], strict=False)
         
@@ -481,23 +469,23 @@ def main():
             )
         AudioTextDataInfo.set_epoch(epoch)
         trainloader = AudioTextDataInfo.dataloader
-        
+        print("start training....")
         # Train one epoch
-        train_one_epoch(
-            args=args,
-            model=ddp_model,
-            epoch=epoch,
-            tokenizer=tokenizer,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            trainloader=trainloader,
-            device_id=device_id,
-            tb=tb
-        )
+        # train_one_epoch(
+        #     args=args,
+        #     model=ddp_model,
+        #     epoch=epoch,
+        #     tokenizer=tokenizer,
+        #     optimizer=optimizer,
+        #     lr_scheduler=lr_scheduler,
+        #     trainloader=trainloader,
+        #     device_id=device_id,
+        #     tb=tb
+        # )
 
         # Save LoRA checkpoint
-        save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
-        time.sleep(1.0)
+        # save_lora_checkpoint(ddp_model.module, optimizer, lr_scheduler, epoch, args)
+        # time.sleep(1.0)
 
         # Validation 
         print("Validation.......")
