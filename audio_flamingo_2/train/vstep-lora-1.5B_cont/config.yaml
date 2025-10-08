@@ -70,7 +70,7 @@ whisper_config:
   method: whisper-large-v3
   path: openai/whisper-large-v3
   audio_embed_dim: 1280
-  sampling_rate: 16000
+  sampling_rate: 15000
 
   window_length: 30.0  # seconds
   window_overlap: 0.0  # seconds

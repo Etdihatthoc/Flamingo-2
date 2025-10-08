@@ -174,15 +174,66 @@ def setup_lora_trainable_params(model, lora_config):
     return model
 
 
+# def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
+#     """Save LoRA checkpoint efficiently"""
+#     if args.rank != 0:
+#         return
+        
+#     exp_path = os.path.join(args.expdir, args.run_name)
+#     checkpoint_dict = {
+#         "epoch": epoch,
+#         "model_state_dict": get_peft_model_state_dict(model.lang_encoder),  # Only save LoRA weights
+#         "optimizer_state_dict": optimizer.state_dict(),
+#         "lr_scheduler_state_dict": lr_scheduler.state_dict(),
+#     }
+    
+#     # Save current checkpoint
+#     checkpoint_path = f"{exp_path}/lora_checkpoint_{epoch}.pt"
+#     torch.save(checkpoint_dict, checkpoint_path)
+#     print(f"Saved LoRA checkpoint: {checkpoint_path}")
+    
+#     # Also save the full audio_transformer_clap state (it's small)
+#     audio_transformer_dict = {
+#         "audio_transformer_clap": model.audio_transformer_clap.state_dict(),
+#         "epoch": epoch
+#     }
+#     audio_checkpoint_path = f"{exp_path}/audio_transformer_checkpoint_{epoch}.pt"
+#     torch.save(audio_transformer_dict, audio_checkpoint_path)
+    
+#     # Keep only the last 5 checkpoints
+#     checkpoint_list = glob.glob(f"{exp_path}/lora_checkpoint_*.pt")
+#     if len(checkpoint_list) > 5:
+#         checkpoint_list.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
+#         for old_ckpt in checkpoint_list[:-3]:
+#             os.remove(old_ckpt)
+#             audio_ckpt = old_ckpt.replace("lora_checkpoint_", "audio_transformer_checkpoint_")
+#             if os.path.exists(audio_ckpt):
+#                 os.remove(audio_ckpt)
+
 def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
-    """Save LoRA checkpoint efficiently"""
+    """Save LoRA checkpoint WITH EMBEDDINGS - FIXED VERSION"""
     if args.rank != 0:
         return
         
     exp_path = os.path.join(args.expdir, args.run_name)
+    
+    # Get LoRA state dict
+    lora_state = get_peft_model_state_dict(model.lang_encoder)
+    
+    # ✅ FIX: ALSO SAVE EMBEDDING LAYER!
+    # Get the full embedding weights (includes special tokens)
+    embedding_state = {
+        "embed_tokens.weight": model.lang_encoder.get_input_embeddings().weight.data.clone()
+    }
+    
+    # If model has output embeddings (lm_head), save it too
+    if hasattr(model.lang_encoder, 'lm_head'):
+        embedding_state["lm_head.weight"] = model.lang_encoder.lm_head.weight.data.clone()
+    
     checkpoint_dict = {
         "epoch": epoch,
-        "model_state_dict": get_peft_model_state_dict(model.lang_encoder),  # Only save LoRA weights
+        "model_state_dict": lora_state,  # LoRA weights
+        "embedding_state_dict": embedding_state,  # ✅ NEW: Embedding weights
         "optimizer_state_dict": optimizer.state_dict(),
         "lr_scheduler_state_dict": lr_scheduler.state_dict(),
     }
@@ -190,9 +241,9 @@ def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
     # Save current checkpoint
     checkpoint_path = f"{exp_path}/lora_checkpoint_{epoch}.pt"
     torch.save(checkpoint_dict, checkpoint_path)
-    print(f"Saved LoRA checkpoint: {checkpoint_path}")
+    print(f"Saved LoRA checkpoint with embeddings: {checkpoint_path}")
     
-    # Also save the full audio_transformer_clap state (it's small)
+    # Also save the full audio_transformer_clap state
     audio_transformer_dict = {
         "audio_transformer_clap": model.audio_transformer_clap.state_dict(),
         "epoch": epoch
@@ -204,12 +255,12 @@ def save_lora_checkpoint(model, optimizer, lr_scheduler, epoch, args):
     checkpoint_list = glob.glob(f"{exp_path}/lora_checkpoint_*.pt")
     if len(checkpoint_list) > 5:
         checkpoint_list.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
-        for old_ckpt in checkpoint_list[:-3]:
+        for old_ckpt in checkpoint_list[:-5]:
             os.remove(old_ckpt)
             audio_ckpt = old_ckpt.replace("lora_checkpoint_", "audio_transformer_checkpoint_")
             if os.path.exists(audio_ckpt):
                 os.remove(audio_ckpt)
-
+ 
 
 def random_seed(seed=42, rank=0):
     torch.manual_seed(seed + rank)
@@ -295,7 +346,7 @@ def main():
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
@@ -612,5 +663,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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
     #17611
