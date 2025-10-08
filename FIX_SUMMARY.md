@@ -123,7 +123,15 @@ generated_ids = model.generate(
 3. Check that all samples are properly processed (no unexpected skips)
 
 ## Related Files
-- Fixed: `audio_flamingo_2/train/metrics.py`
+- Fixed: `audio_flamingo_2/train/metrics.py` (used by `test.py`)
+- Already Correct: `audio_flamingo_2/train/metrics_new.py` (used by `train_lora.py`)
 - Reference: `inference_HF_pretrained/inference.py` (correct pattern)
 - Related: `audio_flamingo_2/src/helpers.py` (where error occurred)
 - Related: `audio_flamingo_2/data/data.py` (data preparation)
+
+## Note
+The repository has two versions of the metrics file:
+1. `metrics.py` - Was broken, now fixed
+2. `metrics_new.py` - Was already fixed with the correct implementation
+
+Both files now use the same correct approach for MAE evaluation.
