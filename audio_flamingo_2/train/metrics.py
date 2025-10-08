@@ -94,8 +94,8 @@ def calculate_mae_metrics(predictions, ground_truths):
 @torch.no_grad()
 def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autocast, cast_dtype, device_id, max_samples=50):
     """
-    Run MAE test on validation set after each epoch
-    Based on validation_losses implementation
+    Run MAE validation - uses model.generate() like inference.py
+    Input format: <audio>{prompt}{sep_token}
     
     Returns:
         - mae_metrics: Dict with MAE scores
@@ -107,9 +107,9 @@ def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autoca
     
     model.eval()
     
-    # Setup tokens (same as validation_losses)
+    # Setup tokens
     media_token_id = tokenizer("<audio>", add_special_tokens=False)["input_ids"][-1]
-    endofchunk_token_id = tokenizer("<|endofchunk|>", add_special_tokens=False)["input_ids"][-1]
+    sep_token_id = tokenizer.sep_token_id
     
     # Get validation data
     all_valid_AudioTextDataInfo = get_audiotext_dataloader(
@@ -124,108 +124,73 @@ def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autoca
     dataset_name = list(all_valid_AudioTextDataInfo.keys())[0]
     validloader = all_valid_AudioTextDataInfo[dataset_name].dataloader
     
-    print(f"Running MAE test on {dataset_name}")
+    print(f"Running MAE validation on {dataset_name}")
     
-    for idx, batch in tqdm(enumerate(validloader), desc="MAE Testing"):
+    for idx, batch in tqdm(enumerate(validloader), desc="MAE Val"):
         if idx >= max_samples:
             break
             
         try:
-            # Load data with correct dtypes (same as validation_losses)
+            # Load data with correct dtypes
             audio_clips = batch["audio_clips"].to(device_id, dtype=cast_dtype, non_blocking=True)
             audio_embed_mask = batch["audio_embed_mask"].to(device_id, dtype=cast_dtype, non_blocking=True)
             
-            # IMPORTANT: input_ids should be torch.long, not cast_dtype
-            input_ids = batch["input_ids"].to(device_id, dtype=torch.long, non_blocking=True)
-            attention_mask = batch["attention_mask"].to(device_id, dtype=cast_dtype, non_blocking=True)
+            # Full input_ids from data (includes prompt + sep + output)
+            input_ids_full = batch["input_ids"].to(device_id, dtype=torch.long, non_blocking=True)
             filenames = batch["filenames"]
             
-            # Extract ground truth by decoding full sequence
-            full_decoded = tokenizer.decode(input_ids[0])
-            
-            # Find SEP token to split prompt and target
-            if tokenizer.sep_token in full_decoded:
-                parts = full_decoded.split(tokenizer.sep_token)
-                if len(parts) >= 2:
-                    prompt_text = parts[0].replace('<audio>', '').strip()
-                    ground_truth_text = parts[-1].replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-                else:
-                    continue
-            else:
-                # Skip samples without SEP token
+            # Verify <audio> token is present
+            has_audio_token = (input_ids_full[0] == media_token_id).any()
+            if not has_audio_token:
+                print(f"WARNING: Sample {idx} missing <audio> token! Skipping...")
                 continue
             
-            # Setup labels (same as validation_losses)
-            labels = input_ids.clone()
-            labels[labels == tokenizer.pad_token_id] = -100
-            labels[:, :1] = -100
-            labels[labels == tokenizer.encode("<audio>")[-1]] = -100
+            # Find SEP token position
+            sep_positions = (input_ids_full[0] == sep_token_id).nonzero(as_tuple=True)[0]
+            if len(sep_positions) == 0:
+                print(f"WARNING: Sample {idx} missing SEP token! Skipping...")
+                continue
             
-            sep_locations = labels == tokenizer.sep_token_id
-            eoc_locations = labels == endofchunk_token_id
+            sep_pos = sep_positions[-1].item()
             
-            # Mask labels (same logic as validation_losses)
-            for i in range(labels.shape[0]):
-                shouldmask = True
-                for j in range(labels.shape[1]):
-                    if shouldmask and (labels[i][j] != tokenizer.eos_token_id):
-                        masked_value = -100
-                    else:
-                        masked_value = labels[i][j]
-
-                    if labels[i][j] == tokenizer.sep_token_id:
-                        shouldmask = False
-                    elif labels[i][j] == endofchunk_token_id:
-                        shouldmask = True
-                    
-                    labels[i][j] = masked_value
-                
-                if labels[i][-1] not in [-100, tokenizer.eos_token_id, tokenizer.pad_token_id, endofchunk_token_id]:
-                    for j in range(labels.shape[1]-1, -1, -1):
-                        if labels[i][j] not in [-100, tokenizer.eos_token_id, endofchunk_token_id]:
-                            labels[i][j] = -100
-                        else:
-                            break
+            # Extract ground truth (everything after SEP)
+            ground_truth_ids = input_ids_full[0, sep_pos+1:]
+            ground_truth_text = tokenizer.decode(ground_truth_ids)
+            ground_truth_text = ground_truth_text.replace('<|endofchunk|>', '').replace(
+                tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
             
-            labels = labels.to(device_id)
+            # Extract prompt (everything before SEP, excluding <audio>)
+            prompt_ids = input_ids_full[0, :sep_pos]
+            prompt_text = tokenizer.decode(prompt_ids).replace('<audio>', '').strip()
             
-            # Forward pass with autocast (same as validation_losses)
+            # Truncate input to only prompt + SEP (for generation, like inference.py)
+            # Format: <audio>{prompt}{sep_token}
+            input_ids_truncated = input_ids_full[:, :sep_pos+1]
+            
+            # Verify <audio> token is still present after truncation
+            has_audio_after_truncate = (input_ids_truncated[0] == media_token_id).any()
+            if not has_audio_after_truncate:
+                print(f"ERROR: Sample {idx} lost <audio> after truncate!")
+                continue
+            
+            # Generate using model.generate() like inference.py
             with autocast():
-                output = model(
+                generated_ids = model.generate(
                     audio_x=audio_clips,
                     audio_x_mask=audio_embed_mask,
-                    lang_x=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels
-                )
+                    lang_x=input_ids_truncated,
+                    eos_token_id=tokenizer.eos_token_id,
+                    pad_token_id=tokenizer.pad_token_id,
+                    max_new_tokens=256,
+                    do_sample=False,
+                )[0]
             
-            # Get prediction from logits
-            logits = output.logits  # Shape: (batch_size, seq_len, vocab_size)
+            # Decode generated output (split after SEP token)
+            output_decoded = tokenizer.decode(generated_ids).split(tokenizer.sep_token)[-1]
+            output_decoded = output_decoded.replace('<|endofchunk|>', '').replace(
+                tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
             
-            # Get predicted tokens (argmax over vocab dimension)
-            pred_tokens = torch.argmax(logits, dim=-1)  # Shape: (batch_size, seq_len)
-            
-            # Find SEP position to get only the generated part
-            sep_positions = (input_ids[0] == tokenizer.sep_token_id).nonzero()
-            if len(sep_positions) > 0:
-                sep_pos = sep_positions[-1].item()
-                # Get predicted tokens after SEP
-                # pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
-                
-                # # Decode prediction
-                # pred_text = tokenizer.decode(pred_tokens_after_sep)
-                # pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-                pred_logits_after_sep = output.logits[0, sep_pos:-1, :]  # -1 because last logit predicts beyond sequence
-                pred_tokens_after_sep = torch.argmax(pred_logits_after_sep, dim=-1)
-                
-                # Decode prediction
-                pred_text = tokenizer.decode(pred_tokens_after_sep)
-                pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-            else:
-                continue
-
-            # print(f"Predicted text: ({pred_text})")
-            # print(f"Ground truth text: ({ground_truth_text})")
+            pred_text = output_decoded.lower()
 
             # Extract scores from both prediction and ground truth
             pred_scores = extract_scores_from_response(pred_text)
@@ -275,8 +240,8 @@ def mae_val_epoch(model, data_config, clap_config, tokenizer, batch_size, autoca
 @torch.no_grad()
 def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autocast, cast_dtype, device_id, max_samples=50):
     """
-    Run MAE test on validation set after each epoch
-    Based on validation_losses implementation
+    Run MAE test on test set - uses model.generate() like inference.py
+    Input format: <audio>{prompt}{sep_token}
     
     Returns:
         - mae_metrics: Dict with MAE scores
@@ -288,11 +253,11 @@ def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autoc
     
     model.eval()
     
-    # Setup tokens (same as validation_losses)
+    # Setup tokens
     media_token_id = tokenizer("<audio>", add_special_tokens=False)["input_ids"][-1]
-    endofchunk_token_id = tokenizer("<|endofchunk|>", add_special_tokens=False)["input_ids"][-1]
+    sep_token_id = tokenizer.sep_token_id
     
-    # Get validation data
+    # Get test data
     all_valid_AudioTextDataInfo = get_audiotext_dataloader(
         data_config, clap_config, tokenizer, batch_size, split='test'
     )
@@ -301,109 +266,77 @@ def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autoc
     ground_truths = []
     sample_logs = []
     
-    # Use the first validation dataset
+    # Use the first test dataset
     dataset_name = list(all_valid_AudioTextDataInfo.keys())[0]
     validloader = all_valid_AudioTextDataInfo[dataset_name].dataloader
     
     print(f"Running MAE test on {dataset_name}")
     
-    for idx, batch in tqdm(enumerate(validloader), desc="MAE Testing"):
+    for idx, batch in tqdm(enumerate(validloader), desc="MAE Test"):
         if idx >= max_samples:
             break
             
         try:
-            # Load data with correct dtypes (same as validation_losses)
+            # Load data with correct dtypes
             audio_clips = batch["audio_clips"].to(device_id, dtype=cast_dtype, non_blocking=True)
             audio_embed_mask = batch["audio_embed_mask"].to(device_id, dtype=cast_dtype, non_blocking=True)
             
-            # IMPORTANT: input_ids should be torch.long, not cast_dtype
-            input_ids = batch["input_ids"].to(device_id, dtype=torch.long, non_blocking=True)
-            attention_mask = batch["attention_mask"].to(device_id, dtype=cast_dtype, non_blocking=True)
+            # Full input_ids from data (includes prompt + sep + output)
+            input_ids_full = batch["input_ids"].to(device_id, dtype=torch.long, non_blocking=True)
             filenames = batch["filenames"]
             
-            # Extract ground truth by decoding full sequence
-            full_decoded = tokenizer.decode(input_ids[0])
-            
-            # Find SEP token to split prompt and target
-            if tokenizer.sep_token in full_decoded:
-                parts = full_decoded.split(tokenizer.sep_token)
-                if len(parts) >= 2:
-                    prompt_text = parts[0].replace('<audio>', '').strip()
-                    ground_truth_text = parts[-1].replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-                else:
-                    continue
-            else:
-                # Skip samples without SEP token
+            # Verify <audio> token is present
+            has_audio_token = (input_ids_full[0] == media_token_id).any()
+            if not has_audio_token:
+                print(f"WARNING: Sample {idx} missing <audio> token! Skipping...")
                 continue
             
-            # Setup labels (same as validation_losses)
-            labels = input_ids.clone()
-            labels[labels == tokenizer.pad_token_id] = -100
-            labels[:, :1] = -100
-            labels[labels == tokenizer.encode("<audio>")[-1]] = -100
+            # Find SEP token position
+            sep_positions = (input_ids_full[0] == sep_token_id).nonzero(as_tuple=True)[0]
+            if len(sep_positions) == 0:
+                print(f"WARNING: Sample {idx} missing SEP token! Skipping...")
+                continue
             
-            sep_locations = labels == tokenizer.sep_token_id
-            eoc_locations = labels == endofchunk_token_id
+            sep_pos = sep_positions[-1].item()
             
-            # Mask labels (same logic as validation_losses)
-            for i in range(labels.shape[0]):
-                shouldmask = True
-                for j in range(labels.shape[1]):
-                    if shouldmask and (labels[i][j] != tokenizer.eos_token_id):
-                        masked_value = -100
-                    else:
-                        masked_value = labels[i][j]
-
-                    if labels[i][j] == tokenizer.sep_token_id:
-                        shouldmask = False
-                    elif labels[i][j] == endofchunk_token_id:
-                        shouldmask = True
-                    
-                    labels[i][j] = masked_value
-                
-                if labels[i][-1] not in [-100, tokenizer.eos_token_id, tokenizer.pad_token_id, endofchunk_token_id]:
-                    for j in range(labels.shape[1]-1, -1, -1):
-                        if labels[i][j] not in [-100, tokenizer.eos_token_id, endofchunk_token_id]:
-                            labels[i][j] = -100
-                        else:
-                            break
+            # Extract ground truth (everything after SEP)
+            ground_truth_ids = input_ids_full[0, sep_pos+1:]
+            ground_truth_text = tokenizer.decode(ground_truth_ids)
+            ground_truth_text = ground_truth_text.replace('<|endofchunk|>', '').replace(
+                tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
             
-            labels = labels.to(device_id)
+            # Extract prompt (everything before SEP, excluding <audio>)
+            prompt_ids = input_ids_full[0, :sep_pos]
+            prompt_text = tokenizer.decode(prompt_ids).replace('<audio>', '').strip()
             
-            # Forward pass with autocast (same as validation_losses)
+            # Truncate input to only prompt + SEP (for generation, like inference.py)
+            # Format: <audio>{prompt}{sep_token}
+            input_ids_truncated = input_ids_full[:, :sep_pos+1]
+            
+            # Verify <audio> token is still present after truncation
+            has_audio_after_truncate = (input_ids_truncated[0] == media_token_id).any()
+            if not has_audio_after_truncate:
+                print(f"ERROR: Sample {idx} lost <audio> after truncate!")
+                continue
+            
+            # Generate using model.generate() like inference.py
             with autocast():
-                output = model(
+                generated_ids = model.generate(
                     audio_x=audio_clips,
                     audio_x_mask=audio_embed_mask,
-                    lang_x=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels
-                )
+                    lang_x=input_ids_truncated,
+                    eos_token_id=tokenizer.eos_token_id,
+                    pad_token_id=tokenizer.pad_token_id,
+                    max_new_tokens=256,
+                    do_sample=False,
+                )[0]
             
-            # Get prediction from logits
-            logits = output.logits  # Shape: (batch_size, seq_len, vocab_size)
+            # Decode generated output (split after SEP token)
+            output_decoded = tokenizer.decode(generated_ids).split(tokenizer.sep_token)[-1]
+            output_decoded = output_decoded.replace('<|endofchunk|>', '').replace(
+                tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
             
-            # Get predicted tokens (argmax over vocab dimension)
-            pred_tokens = torch.argmax(logits, dim=-1)  # Shape: (batch_size, seq_len)
-            
-            # Find SEP position to get only the generated part
-            sep_positions = (input_ids[0] == tokenizer.sep_token_id).nonzero()
-            if len(sep_positions) > 0:
-                sep_pos = sep_positions[-1].item()
-                # Get predicted tokens after SEP
-                # pred_tokens_after_sep = pred_tokens[0, sep_pos+1:]
-                
-                # # Decode prediction
-                # pred_text = tokenizer.decode(pred_tokens_after_sep)
-                # pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-                pred_logits_after_sep = output.logits[0, sep_pos:-1, :]  # -1 because last logit predicts beyond sequence
-                pred_tokens_after_sep = torch.argmax(pred_logits_after_sep, dim=-1)
-                
-                # Decode prediction
-                pred_text = tokenizer.decode(pred_tokens_after_sep)
-                pred_text = pred_text.replace('<|endofchunk|>', '').replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').strip()
-            else:
-                continue
+            pred_text = output_decoded.lower()
             
             # Extract scores from both prediction and ground truth
             pred_scores = extract_scores_from_response(pred_text)
@@ -412,7 +345,7 @@ def mae_test_epoch(model, data_config, clap_config, tokenizer, batch_size, autoc
             predictions.append(pred_scores)
             ground_truths.append(gt_scores)
             
-            # Save samples for logging (first 5 samples)
+            # Save samples for logging
             if len(sample_logs) < 12325:
                 filename = filenames[0] if isinstance(filenames[0], str) else filenames[0][0]
                 sample_logs.append({
