@@ -106,7 +106,11 @@ def inference_this(
         audio_clips = batch["audio_clips"].to(device_id, dtype=cast_dtype, non_blocking=True)
         audio_embed_mask = batch["audio_embed_mask"].to(device_id, dtype=cast_dtype, non_blocking=True)
         input_ids = batch["input_ids"].to(device_id, non_blocking=True)
+        attention_mask = batch["attention_mask"].to(device_id, non_blocking=True)
         filenames = batch["filenames"]
+        ground_truth_texts = batch.get("ground_truth_texts")
+        if ground_truth_texts is None:
+            raise ValueError("Test batch missing 'ground_truth_texts'. Ensure val/test datasets supply ground truth strings.")
         # print(input_ids)
 
         media_token_id = tokenizer.encode("<audio>")[-1]
@@ -127,7 +131,7 @@ def inference_this(
             prompt = input_id[:sep_location+1]
 
             prompt_decoded = tokenizer.decode(prompt).replace(tokenizer.sep_token, '')
-            ground_truth_decoded = tokenizer.decode(input_id).split(tokenizer.sep_token)[-1].replace(tokenizer.eos_token, '').replace(tokenizer.pad_token, '').replace('<|endofchunk|>', '')
+            ground_truth_decoded = str(ground_truth_texts[idx]).strip()
             
             if not (deduplicate and (filename, prompt_decoded) in results_dic):
                 # print(prompt)
@@ -136,6 +140,7 @@ def inference_this(
                     audio_x=audio_clips[idx].unsqueeze(0),
                     audio_x_mask=audio_embed_mask[idx].unsqueeze(0),
                     lang_x=prompt.unsqueeze(0),
+                    attention_mask=attention_mask[idx:idx+1],
                     eos_token_id=tokenizer.eos_token_id,
                     max_new_tokens=256,
                     temperature=temperature,

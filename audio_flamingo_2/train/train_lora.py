@@ -42,7 +42,7 @@ from transformers import (
     get_cosine_schedule_with_warmup,
     get_linear_schedule_with_warmup,
 )
-from metrics_new import mae_test_epoch, mae_val_epoch
+from metrics import mae_test_epoch, mae_val_epoch
 # LoRA imports
 from peft import (
     LoraConfig, 
@@ -334,7 +334,7 @@ def main():
     # Load pretrained weights BEFORE applying LoRA
     if sft_config is not None and sft_config.get('pretrained_ckpt') is None:
         # Load from HuggingFace instead of local checkpoint
-        hf_token = "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"  # Replace with your token or set to None for public models
+        hf_token = "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"  # Replace with your token or set to None for public models
         load_pretrained_from_hf(model, repo_id="nvidia/audio-flamingo-2-1.5B", hf_token=hf_token)
         print("Loaded pretrained model from HuggingFace for SFT.")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
@@ -469,7 +469,7 @@ def main():
             )
         AudioTextDataInfo.set_epoch(epoch)
         trainloader = AudioTextDataInfo.dataloader
-        print("start training....")
+        
         # Train one epoch
         # train_one_epoch(
         #     args=args,
@@ -651,5 +651,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #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
+    #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
     #17611
