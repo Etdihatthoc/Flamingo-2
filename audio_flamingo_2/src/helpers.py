@@ -382,7 +382,10 @@ class MaskedCrossAttention(nn.Module):
 
                 for i in range(-1, len(media_locations_b)):
                     if i == -1:
-                        if len(media_locations_b) == 1:
+                        if len(media_locations_b) == 0:
+                            # No media tokens in this sample - skip
+                            continue
+                        elif len(media_locations_b) == 1:
                             text_start, text_end = 0, T_txt
                         else:
                             text_start, text_end = 0, media_locations_b[i+1]
